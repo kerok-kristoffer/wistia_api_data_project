@@ -1,0 +1,17 @@
+# core
+boto3
+requests
+pyspark==3.3.2         # Glue 4.x runtime; use 3.5.x if targeting Glue 5
+chispa                 # DataFrame assertions
+pandas
+
+# testing
+pytest
+pytest-cov
+requests-mock
+moto[server]           # mock AWS services locally
+freezegun              # time control for watermark tests
+
+# quality
+ruff
+black
