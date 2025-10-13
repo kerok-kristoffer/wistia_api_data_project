@@ -1,4 +1,3 @@
-import pyspark
 from pyspark.sql import SparkSession
 
 def test_spark_creates_df():
