@@ -1,8 +1,14 @@
-[tool.ruff]
-target-version = "py311"
-line-length = 100
-[tool.ruff.lint]
-select = ["E","F","I","B","UP","D"]
-[tool.ruff.lint.per-file-ignores]
-"**/__init__.py" = ["D104"]
-"tests/**" = ["D"]
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wistia-pipeline"
+version = "0.1.0"
+requires-python = ">=3.10"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

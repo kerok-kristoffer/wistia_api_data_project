@@ -1,0 +1,32 @@
+import os
+import sys
+
+import pytest
+from pyspark.sql import SparkSession
+
+
+@pytest.fixture(scope="session")
+def spark():
+    # Use the project venv for both driver and worker
+    os.environ["PYSPARK_PYTHON"] = sys.executable
+    os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
+
+    spark = (
+        SparkSession.builder.master("local[1]")
+        .appName("tests")
+        .config("spark.ui.enabled", "false")
+        .config("spark.ui.showConsoleProgress", "false")
+        .config("spark.sql.execution.pyspark.udf.faulthandler.enabled", "true")
+        .getOrCreate()
+    )
+    spark.sparkContext.setLogLevel("ERROR")
+    yield spark
+    spark.stop()
+
+
+@pytest.fixture(autouse=True)
+def _aws_dummy_env(monkeypatch):
+    # Safe defaults for tests; real creds come from contract tests only
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "test")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "test")
