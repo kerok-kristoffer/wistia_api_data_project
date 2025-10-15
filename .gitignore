@@ -1,0 +1,18 @@
+# Python
+.venv/
+__pycache__/
+.pytest_cache/
+.coverage
+.coverage.*
+.mypy_cache/
+.ruff_cache/
+.DS_Store
+
+# PyCharm / IntelliJ
+.idea/
+*.iml
+
+# Build
+dist/
+build/
+*.egg-info/
