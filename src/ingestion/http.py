@@ -28,10 +28,19 @@ class WistiaClient:
     def _request(self, path: str, params: Dict[str, Any]) -> Dict[str, Any]:
         url = f"{self.base_url}/{path.lstrip('/')}"
         backoff = 1.0
-        for attempt in range(5):
-            resp = self.session.get(url, params=params, timeout=self.timeout_s)
+        for _ in range(5):
+            try:
+                resp = self.session.get(url, params=params, timeout=self.timeout_s)
+            except requests.exceptions.Timeout:
+                # Treat timeouts like transient errors and retry
+                time.sleep(backoff)
+                backoff = min(backoff * 2, 8)
+                continue
             if resp.status_code == 200:
-                return resp.json()
+                try:
+                    return resp.json()
+                except ValueError as e:
+                    raise WistiaError("Invalid JSON in response") from e
             if resp.status_code == 401:
                 raise AuthError("Unauthorized")
             if resp.status_code == 404:
@@ -44,5 +53,4 @@ class WistiaClient:
         raise WistiaError("Gave up after retries")
 
     def media_stats(self, media_id: str, **params) -> Dict[str, Any]:
-        # Example endpoint from your brief:
         return self._request(f"stats/medias/{media_id}.json", params=params)
