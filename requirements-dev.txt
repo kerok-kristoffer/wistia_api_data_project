@@ -2,6 +2,7 @@
 boto3
 requests
 pyspark==3.5.1         # Glue 4.x runtime; use 3.5.x if targeting Glue 5
+python-dotenv
 chispa                 # DataFrame assertions
 pandas
 

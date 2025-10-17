@@ -36,12 +36,12 @@ jobs:
           pip install -r requirements-dev.txt
           pip install -e .               
 
-      # Optional: quick import smoke check
       - name: Verify package import
         run: |
           python - <<'PY'
-          import transforms, sys
+          import transforms, sys, ingestion
           print("transforms path:", getattr(transforms, "__file__", "n/a"))
+          print("ingestion path:", getattr(ingestion, "__file__", "n/a"))
           print("python:", sys.version)
           PY
 
