@@ -171,3 +171,69 @@ def test_injected_session_is_used():
 
     client.media_stats("abc")
     assert sess.used is True
+
+
+# ---- tests for /stats/events ----
+@responses.activate
+def test_events_happy_path_returns_list():
+    client = WistiaClient("https://api.wistia.com/v1", "fake")
+    url = "https://api.wistia.com/v1/stats/events"
+    payload = [{"event_key": "e1"}, {"event_key": "e2"}]
+    responses.add(responses.GET, url, json=payload, status=200)
+
+    data = client.events()
+    assert isinstance(data, list)
+    assert [d["event_key"] for d in data] == ["e1", "e2"]
+
+
+@responses.activate
+def test_events_params_pass_through():
+    client = WistiaClient("https://api.wistia.com/v1", "fake")
+    url = "https://api.wistia.com/v1/stats/events"
+    responses.add(responses.GET, url, json=[], status=200)  # we’ll inspect the request
+
+    data = client.events(
+        media_id="abc123",
+        start_date="2025-10-17",
+        end_date="2025-10-17",
+        per_page=50,
+        page=2,
+    )
+    assert data == []
+
+    req_url = responses.calls[0].request.url
+    qs = dict(urllib.parse.parse_qsl(urllib.parse.urlsplit(req_url).query))
+    assert qs == {
+        "media_id": "abc123",
+        "start_date": "2025-10-17",
+        "end_date": "2025-10-17",
+        "per_page": "50",
+        "page": "2",
+    }
+
+
+@responses.activate
+def test_events_non_list_raises_wistiaerror():
+    client = WistiaClient("https://api.wistia.com/v1", "fake")
+    url = "https://api.wistia.com/v1/stats/events"
+    # Force a bad shape (dict instead of list)
+    responses.add(responses.GET, url, json={"oops": True}, status=200)
+
+    with pytest.raises(WistiaError):
+        client.events()
+
+
+@responses.activate
+def test_events_429_then_success(monkeypatch):
+    # Speed up backoff
+    monkeypatch.setattr(time, "sleep", lambda s: None)
+
+    client = WistiaClient("https://api.wistia.com/v1", "fake")
+    url = "https://api.wistia.com/v1/stats/events"
+
+    responses.add(responses.GET, url, status=429)
+    responses.add(responses.GET, url, json=[{"event_key": "e1"}], status=200)
+
+    data = client.events()
+    assert data == [{"event_key": "e1"}]
+    assert len(responses.calls) == 2
