@@ -25,7 +25,7 @@ class WistiaClient:
         self.session = session or requests.Session()
         self.session.headers.update({"Authorization": f"Bearer {token}"})
 
-    def _request(self, path: str, params: Dict[str, Any]) -> Dict[str, Any]:
+    def _request(self, path: str, params: Dict[str, Any]) -> Any:
         url = f"{self.base_url}/{path.lstrip('/')}"
         backoff = 1.0
         for _ in range(5):
@@ -54,3 +54,13 @@ class WistiaClient:
 
     def media_stats(self, media_id: str, **params) -> Dict[str, Any]:
         return self._request(f"stats/medias/{media_id}.json", params=params)
+
+    def events(self, **params) -> list[Dict[str, Any]]:
+        """
+        Wrapper for GET /v1/stats/events
+        Returns a list of event dicts (possibly empty).
+        """
+        data = self._request("stats/events", params=params)
+        if not isinstance(data, list):
+            raise WistiaError("Expected a list from /stats/events")
+        return data
