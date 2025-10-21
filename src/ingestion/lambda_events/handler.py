@@ -54,7 +54,7 @@ def fetch_all_events(
     return rows
 
 
-def _load_wistia_secret():
+def _load_wistia_secret() -> dict:
     arn = os.getenv("WISTIA_SECRET_ARN")
     if not arn:
         token = os.getenv("WISTIA_API_TOKEN")
@@ -97,6 +97,23 @@ def _load_wistia_secret():
         return {"api_token": secret, "media_ids": []}
 
 
+def _merge_secret_into_env(secret: dict) -> None:
+    # Let explicit env override secret (so setdefault, not overwrite).
+    token = secret.get("api_token")
+    if token:
+        os.environ.setdefault("WISTIA_API_TOKEN", token)
+
+    media_ids = secret.get("media_ids")
+    if media_ids:
+        if isinstance(media_ids, list):
+            media_ids = ",".join(media_ids)
+        os.environ.setdefault("MEDIA_IDS", media_ids)
+
+    ip_hmac = secret.get("hmac_secret") or secret.get("ip_hash_key")
+    if ip_hmac:
+        os.environ.setdefault("VISITOR_IP_HMAC_KEY", ip_hmac)
+
+
 def handler(event, context):
     """
     Event (Step Functions or manual):
@@ -105,9 +122,12 @@ def handler(event, context):
       "media_ids": ["abc","def"]    # optional; defaults to Settings.media_ids
     }
     """
-    cfg = Settings.from_env()
     wistia_secrets = _load_wistia_secret()
-    media_ids = wistia_secrets.get("media_ids")
+    _merge_secret_into_env(wistia_secrets)
+
+    cfg = Settings.from_env()
+    event_media_ids = event.get("media_ids") if isinstance(event, dict) else None
+    media_ids = event_media_ids or (cfg.media_ids or [])
 
     client = WistiaClient(
         base_url=cfg.base_url,
