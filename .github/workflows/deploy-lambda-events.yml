@@ -61,7 +61,7 @@ jobs:
         env:
           LAMBDA_NAME: ${{ vars.LAMBDA_EVENTS_NAME }}
         run: |
-          DAY=$(date -u +%F)
+          DAY=$(date -u -d "yesterday" +%F)
           aws lambda invoke \
             --function-name "$LAMBDA_NAME" \
             --payload "{\"day\":\"$DAY\"}" \
