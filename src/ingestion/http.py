@@ -1,6 +1,6 @@
 import time
 import requests
-from typing import Any, Dict
+from typing import List, Any, Dict
 
 
 class WistiaError(Exception): ...
@@ -64,3 +64,17 @@ class WistiaClient:
         if not isinstance(data, list):
             raise WistiaError("Expected a list from /stats/events")
         return data
+
+    def media_stats_by_date(
+        self, media_id: str, start_date: str, end_date: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Calls: GET /stats/medias/{media_id}/by_date?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
+        Returns a list of daily KPI dicts (possibly empty).
+        """
+        path = f"stats/medias/{media_id}/by_date"  # no leading slash needed
+        params = {"start_date": start_date, "end_date": end_date}
+        resp = self._request(path, params=params)  # <-- call signature fix
+        if not isinstance(resp, list):
+            raise WistiaError(f"Unexpected payload for by_date: {type(resp)}")
+        return resp
