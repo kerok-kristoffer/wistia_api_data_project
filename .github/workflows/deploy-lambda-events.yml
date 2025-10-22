@@ -61,10 +61,11 @@ jobs:
         env:
           LAMBDA_NAME: ${{ vars.LAMBDA_EVENTS_NAME }}
         run: |
-          DAY=$(date -u -d "yesterday" +%F)
+          DAY="2025-09-06"
+          PAYLOAD=$(jq -nc --arg day "$DAY" '{day:$day}')
           aws lambda invoke \
             --function-name "$LAMBDA_NAME" \
-            --payload "{\"day\":\"$DAY\"}" \
+            --payload "$PAYLOAD" \
             --cli-binary-format raw-in-base64-out \
             out.json
           echo "Lambda response:"
