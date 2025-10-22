@@ -57,16 +57,49 @@ jobs:
             --publish
 
       - name: Smoke invoke
-        if: ${{ vars.SMOKE_INVOKE == 'true' }}
+        if: ${{ vars.LAMBDA_NAME_EVENTS || 'ingestion-lambda-events' }}
         env:
           LAMBDA_NAME: ${{ vars.LAMBDA_EVENTS_NAME }}
         run: |
           DAY="2025-09-06"
+          # [ -z "$DAY" ] && DAY=$(date -u -d "yesterday" +%F)
+          
+          # Build payload safely
           PAYLOAD=$(jq -nc --arg day "$DAY" '{day:$day}')
-          aws lambda invoke \
+          
+          # Invoke and capture envelope (StatusCode, FunctionError, LogResult)
+          ENVELOPE=$(aws lambda invoke \
             --function-name "$LAMBDA_NAME" \
             --payload "$PAYLOAD" \
             --cli-binary-format raw-in-base64-out \
-            out.json
-          echo "Lambda response:"
-          cat out.json
+            --log-type Tail \
+            out.json \
+            --query '{StatusCode:StatusCode,FunctionError:FunctionError,LogResult:LogResult}' \
+            --output json)
+          
+          echo "Invoke envelope:"
+          echo "$ENVELOPE" | jq .
+          
+          # Fail the job if Lambda reported an error
+          ERR=$(echo "$ENVELOPE" | jq -r '.FunctionError // ""')
+          if [ -n "$ERR" ] && [ "$ERR" != "null" ]; then
+            echo "Lambda reported FunctionError: $ERR"
+            echo "---- Last 4KB of Lambda logs ----"
+            echo "$ENVELOPE" | jq -r '.LogResult' | base64 -d || true
+            exit 1
+          fi
+          
+          echo "Lambda response payload:"
+          cat out.json | jq .
+          
+          # Summary
+          {
+            echo "### Wistia Events Smoke"
+            echo "- Function: \`$LAMBDA_NAME\`"
+            echo "- Day: \`$DAY\`"
+            echo "- Returned:"
+            cat out.json | jq -r '"  - day: \(.day)\n  - media: \(.media|length) ids\n"'
+            echo ""
+            echo "Rows per media:"
+            cat out.json | jq -r '.media[] | "  - \(.media_id): \(.rows) row(s)"'
+          } >> "$GITHUB_STEP_SUMMARY"
