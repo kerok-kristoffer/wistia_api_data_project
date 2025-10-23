@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 
 # Prefer project client if available
 try:
-    from src.http.client import WistiaClient  # type: ignore
+    from http.client import WistiaClient  # type: ignore
 except Exception:  # pragma: no cover
     # Fallback minimal client if import path differs during early scaffolding
     import requests
