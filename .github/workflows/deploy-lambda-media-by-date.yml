@@ -1,0 +1,105 @@
+name: Deploy Lambda (events)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "src/ingestion/lambda_events/**"
+      - "lambda_requirements.txt"
+      - ".github/workflows/deploy-lambda-events.yml"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    environment: kerok-vistia-env
+    if: ${{ toJSON(vars.ENABLE_DEPLOY) == '"true"' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Configure AWS (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ vars.GH_OIDC_ROLE }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Build deployment zip
+        run: |
+          set -e
+          rm -rf build lambda_events.zip
+          python -m pip install -U pip
+          pip install -r lambda_requirements.txt -t build
+          mkdir -p build_tmp
+          cp -r src/* build_tmp/
+          cp -r build/* build_tmp/
+          cd build_tmp
+          zip -r ../lambda_events.zip .
+          cd ..
+          ls -lh lambda_events.zip
+
+      - name: Who am I?
+        run: aws sts get-caller-identity
+
+      - name: Deploy code to Lambda
+        env:
+          LAMBDA_NAME: ${{ vars.LAMBDA_EVENTS_NAME }}
+        run: |
+          aws lambda update-function-code \
+            --function-name "$LAMBDA_NAME" \
+            --zip-file fileb://lambda_events.zip \
+            --publish
+
+      - name: Smoke invoke
+        if: ${{ vars.LAMBDA_NAME_EVENTS || 'ingestion-lambda-events' }}
+        env:
+          LAMBDA_NAME: ${{ vars.LAMBDA_EVENTS_NAME }}
+        run: |
+          DAY="2025-09-06"
+          # [ -z "$DAY" ] && DAY=$(date -u -d "yesterday" +%F)
+          
+          # Build payload safely
+          PAYLOAD=$(jq -nc --arg day "$DAY" '{day:$day}')
+          
+          # Invoke and capture envelope (StatusCode, FunctionError, LogResult)
+          ENVELOPE=$(aws lambda invoke \
+            --function-name "$LAMBDA_NAME" \
+            --payload "$PAYLOAD" \
+            --cli-binary-format raw-in-base64-out \
+            --log-type Tail \
+            out.json \
+            --query '{StatusCode:StatusCode,FunctionError:FunctionError,LogResult:LogResult}' \
+            --output json)
+          
+          echo "Invoke envelope:"
+          echo "$ENVELOPE" | jq .
+          
+          # Fail the job if Lambda reported an error
+          ERR=$(echo "$ENVELOPE" | jq -r '.FunctionError // ""')
+          if [ -n "$ERR" ] && [ "$ERR" != "null" ]; then
+            echo "Lambda reported FunctionError: $ERR"
+            echo "---- Last 4KB of Lambda logs ----"
+            echo "$ENVELOPE" | jq -r '.LogResult' | base64 -d || true
+            exit 1
+          fi
+          
+          echo "Lambda response payload:"
+          cat out.json | jq .
+          
+          # Summary
+          {
+            echo "### Wistia Events Smoke"
+            echo "- Function: \`$LAMBDA_NAME\`"
+            echo "- Day: \`$DAY\`"
+            echo "- Returned:"
+            cat out.json | jq -r '"  - day: \(.day)\n  - media: \(.media|length) ids\n"'
+            echo ""
+            echo "Rows per media:"
+            cat out.json | jq -r '.media[] | "  - \(.media_id): \(.rows) row(s)"'
+          } >> "$GITHUB_STEP_SUMMARY"
