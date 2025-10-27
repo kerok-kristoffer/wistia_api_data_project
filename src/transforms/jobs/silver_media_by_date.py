@@ -39,15 +39,24 @@ def _transform(df: DataFrame, day: str) -> DataFrame:
             else F.lit(None).cast(dtype)
         )
 
-    df = _with_media_from_path(df).select(
-        "*",
-        cast_nullable("day", DateType()).alias("day"),
-        cast_nullable("load_count", LongType()).alias("load_count"),
-        cast_nullable("play_count", LongType()).alias("play_count"),
-        cast_nullable("play_rate", DoubleType()).alias("play_rate"),
-        cast_nullable("hours_watched", DoubleType()).alias("hours_watched"),
-        cast_nullable("engagement", DoubleType()).alias("engagement"),
-        cast_nullable("visitors", LongType()).alias("visitors"),
+    df = _with_media_from_path(df)
+
+    # If 'day' already exists, drop it to avoid ambiguity.
+    if "day" in df.columns:
+        df = df.drop("day")
+
+    # Build typed 'day' from source 'date'
+    df = df.withColumn("day", cast_nullable("date", DateType()))
+
+    # (Optional) drop the original 'date' if you don't want it downstream
+    df = df.drop("date")
+    df = (
+        df.withColumn("load_count", cast_nullable("load_count", LongType()))
+        .withColumn("play_count", cast_nullable("play_count", LongType()))
+        .withColumn("play_rate", cast_nullable("play_rate", DoubleType()))
+        .withColumn("hours_watched", cast_nullable("hours_watched", DoubleType()))
+        .withColumn("engagement", cast_nullable("engagement", DoubleType()))
+        .withColumn("visitors", cast_nullable("visitors", LongType()))
     )
 
     # Partition + metadata
