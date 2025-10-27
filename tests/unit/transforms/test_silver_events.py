@@ -1,6 +1,7 @@
 # tests/transforms/test_silver_events.py
 import json
 import pytest
+from datetime import date
 from pathlib import Path
 from transforms.jobs.silver_events import main as run_job
 
@@ -59,7 +60,8 @@ def test_silver_events_hashes_ip_and_partitions(tmp_path, spark, monkeypatch):
     df = spark.read.parquet(f"{out_uri}/events")
     # partition columns exist
     assert set(["dt", "media_id"]).issubset(df.columns)
-    assert df.select("dt").distinct().collect()[0][0] == day
+    # dt is inferred as DATE by Spark from the partition directory name (dt=YYYY-MM-DD)
+    assert df.select("dt").distinct().collect()[0][0] == date.fromisoformat(day)
     assert df.select("media_id").distinct().collect()[0][0] == "abc123"
 
     # privacy: raw ip dropped, hmac present
