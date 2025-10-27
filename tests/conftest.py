@@ -31,7 +31,6 @@ def spark():
         .config("spark.ui.enabled", "false")
         .config("spark.ui.showConsoleProgress", "false")
         .config("spark.sql.execution.pyspark.udf.faulthandler.enabled", "true")
-        .config("spark.sql.sources.partitionColumnTypeInference.enabled", "false")
         .getOrCreate()
     )
     spark.sparkContext.setLogLevel("ERROR")

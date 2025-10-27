@@ -51,7 +51,7 @@ def test_silver_media_by_date_typing_and_partitioning(tmp_path, spark):
     df = spark.read.parquet(f"{out_uri}/media_by_date")
     # partition columns present
     assert set(["dt", "media_id"]).issubset(df.columns)
-    assert df.select("dt").distinct().collect()[0][0] == day
+    assert df.selectExpr("CAST(dt AS STRING) AS dt").distinct().collect()[0][0] == day
     assert df.select("media_id").distinct().collect()[0][0] == "abc123"
 
     # schema typing
