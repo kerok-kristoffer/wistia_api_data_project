@@ -81,12 +81,14 @@ def _transform(df: DataFrame, day: str) -> DataFrame:
 
 def _write(df: DataFrame, output_uri: str):
     dest = f"{output_uri.rstrip('/')}/media_by_date"
+    # Ensure partition column type matches test expectation (STRING)
+    df2 = df.withColumn("dt", F.col("dt").cast("string"))
+
     (
-        df.repartition("dt", "media_id")
+        df2.repartition("dt", "media_id")
         .write.mode("overwrite")
-        .format("parquet")
         .partitionBy("dt", "media_id")
-        .save(dest)
+        .parquet(dest)  # same as .format("parquet").save(dest)
     )
 
 
