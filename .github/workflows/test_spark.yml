@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Optional: speed up ivy/pip by caching host dirs; we’ll mount them into docker
+      # speeding up ivy/pip by caching host dirs; we’ll mount them into docker
       - name: Prep cache dirs
         run: |
           mkdir -p $HOME/.ivy2/cache
@@ -28,8 +28,7 @@ jobs:
       - name: Build spark image
         run: docker build -f Dockerfile.spark -t wistia-spark:latest .
 
-      # If Dockerfile.spark doesn’t have pytest baked in, add this line in the run:
-      # sh -lc "python -m pip install -q pytest && python -m pytest -q -m spark"
+      # sh -lc "python -m pip install -q pytest pytest-cov && python -m pytest -q tests/unit/transforms -m spark"
       - name: Run Spark-marked tests in container
         run: |
           docker run --rm \
@@ -38,4 +37,4 @@ jobs:
             -v "$HOME/.ivy2/cache:/root/.ivy2/cache" \
             -v "$HOME/.cache/pip:/root/.cache/pip" \
             wistia-spark:latest \
-            sh -lc "python -m pip install -q pytest && python -m pytest -q -m spark"
+            sh -lc "python -m pip install -q pytest pytest-cov && python -m pytest -q tests/unit/transforms -m spark"
