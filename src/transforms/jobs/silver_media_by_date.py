@@ -48,7 +48,6 @@ def _transform(df: DataFrame, day: str) -> DataFrame:
     # Build typed 'day' from source 'date'
     df = df.withColumn("day", cast_nullable("date", DateType()))
 
-    # (Optional) drop the original 'date' if you don't want it downstream
     df = df.drop("date")
     df = (
         df.withColumn("load_count", cast_nullable("load_count", LongType()))
@@ -60,7 +59,7 @@ def _transform(df: DataFrame, day: str) -> DataFrame:
     )
 
     # Partition + metadata
-    df = df.withColumn("dt", F.lit(day)).withColumn(
+    df = df.withColumn("dt", F.lit(day).cast("string")).withColumn(
         "processed_at", F.current_timestamp()
     )
 
