@@ -39,8 +39,8 @@ def _transform(df: DataFrame, day: str) -> DataFrame:
             else F.lit(None).cast(dtype)
         )
 
-    df = df.select(
-        _with_media_from_path(df).colRegex(".*"),  # ensure media_id exists
+    df = _with_media_from_path(df).select(
+        "*",
         cast_nullable("day", DateType()).alias("day"),
         cast_nullable("load_count", LongType()).alias("load_count"),
         cast_nullable("play_count", LongType()).alias("play_count"),
