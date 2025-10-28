@@ -1,0 +1,40 @@
+name: Tests (Spark)
+
+on:
+  push:
+    paths:
+      - "src/transforms/**"
+      - "tests/unit/transforms/**"
+      - "Dockerfile.spark"
+      - ".github/workflows/test-spark.yml"
+  pull_request:
+    paths:
+      - "src/transforms/**"
+      - "tests/unit/transforms/**"
+      - "Dockerfile.spark"
+
+jobs:
+  spark-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # speeding up ivy/pip by caching host dirs; we’ll mount them into docker
+      - name: Prep cache dirs
+        run: |
+          mkdir -p $HOME/.ivy2/cache
+          mkdir -p $HOME/.cache/pip
+
+      - name: Build spark image
+        run: docker build -f Dockerfile.spark -t wistia-spark:latest .
+
+      # sh -lc "python -m pip install -q pytest pytest-cov && python -m pytest -q tests/unit/transforms -m spark"
+      - name: Run Spark-marked tests in container
+        run: |
+          docker run --rm \
+            -e PYTHONPATH=/app/src \
+            -v "$PWD:/app" \
+            -v "$HOME/.ivy2/cache:/root/.ivy2/cache" \
+            -v "$HOME/.cache/pip:/root/.cache/pip" \
+            wistia-spark:latest \
+            sh -lc "python -m pip install -q pytest pytest-cov && python -m pytest -q tests/unit/transforms -m spark"

@@ -1,4 +1,5 @@
 import os
+import platform
 import sys
 
 import pytest
@@ -13,6 +14,13 @@ if str(SRC) not in sys.path:
 
 @pytest.fixture(scope="session")
 def spark():
+    # Skip all tests marked "spark" on Windows unless user opted in
+    if platform.system() == "Windows" and not os.environ.get("SPARK_ON_WINDOWS"):
+        pytest.skip(
+            "Skipping Spark tests on Windows (set SPARK_ON_WINDOWS=1 to force).",
+            allow_module_level=True,
+        )
+
     # Use the project venv for both driver and worker
     os.environ["PYSPARK_PYTHON"] = sys.executable
     os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
