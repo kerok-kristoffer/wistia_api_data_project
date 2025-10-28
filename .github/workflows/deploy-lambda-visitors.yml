@@ -53,7 +53,7 @@ jobs:
           aws lambda update-function-code \
             --function-name "$LAMBDA_NAME" \
             --zip-file fileb://lambda_visitors.zip \
-            --publish
+            --p
 
       - name: Smoke invoke
         env:
@@ -67,14 +67,35 @@ jobs:
             PAYLOAD=$(jq -nc --arg day "$DAY" '{day:$day}')
           fi
 
-          aws lambda invoke \
+          ENVELOPE=$(aws lambda invoke \
             --function-name "$LAMBDA_NAME" \
             --payload "$PAYLOAD" \
             --cli-binary-format raw-in-base64-out \
             --log-type Tail \
             out.json \
             --query '{StatusCode:StatusCode,FunctionError:FunctionError,LogResult:LogResult}' \
-            --output json
-
-          echo "Lambda response:"
+            --output json)
+          
+          echo "Invoke envelope:"
+          echo "$ENVELOPE" | jq .
+          
+          # Fail if FunctionError is set
+          ERR=$(echo "$ENVELOPE" | jq -r '.FunctionError // ""')
+          if [ -n "$ERR" ] && [ "$ERR" != "null" ]; then
+            echo "Lambda reported FunctionError: $ERR"
+            echo "---- Last logs (decoded) ----"
+            echo "$ENVELOPE" | jq -r '.LogResult' | base64 -d || true
+            echo "---- Lambda response body ----"
+            cat out.json | jq . || cat out.json
+            exit 1
+          fi
+          
+          # Fail for non-200 HTTP envelope
+          SC=$(echo "$ENVELOPE" | jq -r '.StatusCode')
+          if [ "$SC" -lt 200 ] || [ "$SC" -ge 300 ]; then
+            echo "Non-2xx StatusCode from invoke: $SC"
+            exit 1
+          fi
+          
+          echo "Lambda response payload:"
           cat out.json | jq .
