@@ -65,7 +65,8 @@ jobs:
         run: |
           aws lambda update-function-configuration \
             --function-name "$LAMBDA_NAME" \
-            --environment "Variables={RAW_BUCKET=$RAW_BUCKET,RAW_PREFIX=$RAW_PREFIX,WISTIA_SECRET_NAME=$WISTIA_SECRET_NAME,MEDIA_IDS_SECRET_NAME=$MEDIA_IDS_SECRET_NAME}"
+            --environment "$ENV_JSON" \
+            --region us-east-1
 
       - name: Smoke invoke
         env:
