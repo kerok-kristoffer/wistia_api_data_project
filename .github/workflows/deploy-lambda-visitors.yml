@@ -1,0 +1,92 @@
+name: Deploy Lambda (visitors)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "src/ingestion/lambda_visitors/**"
+      - "lambda_requirements.txt"
+      - ".github/workflows/deploy-lambda-visitors.yml"
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    environment: kerok-vistia-env
+    if: ${{ toJSON(vars.ENABLE_DEPLOY) == '"true"' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Configure AWS (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ vars.GH_OIDC_ROLE }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Build deployment zip
+        run: |
+          set -e
+          rm -rf build lambda_visitors.zip
+          python -m pip install -U pip
+          pip install -r lambda_requirements.txt -t build
+          mkdir -p build_tmp
+          cp -r src/* build_tmp/
+          cp -r build/* build_tmp/
+          (cd build_tmp && zip -r ../lambda_visitors.zip .)
+          ls -lh lambda_visitors.zip
+
+      - name: Who am I?
+        run: aws sts get-caller-identity
+
+      - name: Update code
+        env:
+          LAMBDA_NAME: ${{ vars.LAMBDA_VISITORS_NAME }}
+        run: |
+          aws lambda update-function-code \
+            --function-name "$LAMBDA_NAME" \
+            --zip-file fileb://lambda_visitors.zip \
+            --publish
+
+      - name: Update environment (S3 + secret names)
+        env:
+          LAMBDA_NAME: ${{ vars.LAMBDA_VISITORS_NAME }}
+          RAW_BUCKET: ${{ vars.RAW_BUCKET }}
+          RAW_PREFIX: raw/wistia/visitors
+          WISTIA_SECRET_NAME: ${{ vars.WISTIA_SECRET_NAME }}
+          MEDIA_IDS_SECRET_NAME: ${{ vars.MEDIA_IDS_SECRET_NAME }}
+        run: |
+          aws lambda update-function-configuration \
+            --function-name "$LAMBDA_NAME" \
+            --environment "Variables={RAW_BUCKET=$RAW_BUCKET,RAW_PREFIX=$RAW_PREFIX,WISTIA_SECRET_NAME=$WISTIA_SECRET_NAME,MEDIA_IDS_SECRET_NAME=$MEDIA_IDS_SECRET_NAME}"
+
+      - name: Smoke invoke
+        env:
+          LAMBDA_NAME: ${{ vars.LAMBDA_VISITORS_NAME }}
+          DAY: "2025-09-06"
+          MEDIA_IDS: ${{ vars.MEDIA_IDS_FOR_SMOKE || '' }} # optional: CSV in env var
+        run: |
+          if [ -n "$MEDIA_IDS" ]; then
+            PAYLOAD=$(jq -nc --arg day "$DAY" --arg mids "$MEDIA_IDS" '{day:$day, media_ids: ($mids|split(","))}')
+          else
+            PAYLOAD=$(jq -nc --arg day "$DAY" '{day:$day}')
+          fi
+
+          aws lambda invoke \
+            --function-name "$LAMBDA_NAME" \
+            --payload "$PAYLOAD" \
+            --cli-binary-format raw-in-base64-out \
+            --log-type Tail \
+            out.json \
+            --query '{StatusCode:StatusCode,FunctionError:FunctionError,LogResult:LogResult}' \
+            --output json
+
+          echo "Lambda response:"
+          cat out.json | jq .

@@ -78,3 +78,25 @@ class WistiaClient:
         if not isinstance(resp, list):
             raise WistiaError(f"Unexpected payload for by_date: {type(resp)}")
         return resp
+
+    def stats_visitors(
+        self,
+        *,
+        media_id: str,
+        page: int = 1,
+    ) -> List[Dict[str, Any]]:
+        """
+        GET /v1/stats/visitors.json?media_id=<id>&page=<n>
+        Returns a list of visitors for a media.
+
+        Note: Wistia's API for this endpoint typically supports `page`; if `per_page`
+        is not supported, it will be ignored by the API (we still accept it for parity).
+        """
+        params: Dict[str, Any] = {"media_id": media_id, "page": page}
+
+        return self._request(
+            "/stats/visitors.json",
+            params=params,
+            # Expect a JSON array; if the API returns an envelope, _request should already
+            # normalize or you can add a small guard here if your _request is "raw".
+        )
