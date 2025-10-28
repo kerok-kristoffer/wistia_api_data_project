@@ -53,7 +53,7 @@ jobs:
           aws lambda update-function-code \
             --function-name "$LAMBDA_NAME" \
             --zip-file fileb://lambda_visitors.zip \
-            --p
+            --publish
 
       - name: Smoke invoke
         env:
