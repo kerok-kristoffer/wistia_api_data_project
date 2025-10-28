@@ -39,7 +39,7 @@ def handler(event, context):
                 break
             rows_total += len(batch)
             print(
-                f"[VISITORS] Writing {len(rows_total)} rows to s3://{cfg.s3_bucket_raw}/{visitors_key(cfg.s3_prefix_raw, target_day, mid, page)}"
+                f"[VISITORS] Writing {rows_total} rows to s3://{cfg.s3_bucket_raw}/{visitors_key(cfg.s3_prefix_raw, target_day, mid, page)}"
             )
             put_jsonl_lines(
                 s3,
