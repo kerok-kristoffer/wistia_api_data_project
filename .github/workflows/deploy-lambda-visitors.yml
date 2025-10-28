@@ -55,19 +55,6 @@ jobs:
             --zip-file fileb://lambda_visitors.zip \
             --publish
 
-      - name: Update environment (S3 + secret names)
-        env:
-          LAMBDA_NAME: ${{ vars.LAMBDA_VISITORS_NAME }}
-          RAW_BUCKET: ${{ vars.RAW_BUCKET }}
-          RAW_PREFIX: raw/wistia/visitors
-          WISTIA_SECRET_NAME: ${{ vars.WISTIA_SECRET_NAME }}
-          MEDIA_IDS_SECRET_NAME: ${{ vars.MEDIA_IDS_SECRET_NAME }}
-        run: |
-          aws lambda update-function-configuration \
-            --function-name "$LAMBDA_NAME" \
-            --environment "$ENV_JSON" \
-            --region us-east-1
-
       - name: Smoke invoke
         env:
           LAMBDA_NAME: ${{ vars.LAMBDA_VISITORS_NAME }}
