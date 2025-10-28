@@ -33,6 +33,9 @@ def handler(event, context):
             if not batch:
                 break
             rows_total += len(batch)
+            print(
+                f"[VISITORS] Writing {len(rows_total)} rows to s3://{cfg.s3_bucket_raw}/{visitors_key(cfg.s3_prefix_raw, target_day, mid, page)}"
+            )
             put_jsonl_lines(
                 s3,
                 bucket=cfg.s3_bucket_raw,
