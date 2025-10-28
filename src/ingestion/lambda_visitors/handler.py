@@ -37,9 +37,10 @@ def handler(event, context):
             batch = client.stats_visitors(media_id=mid, page=page)
             if not batch:
                 break
-            rows_total += len(batch)
+            batch_size = len(batch)
+            rows_total += batch_size
             print(
-                f"[VISITORS] Writing {len(batch)} rows to s3://{cfg.s3_bucket_raw}/{visitors_key(cfg.s3_prefix_raw, target_day, mid, page)}"
+                f"[VISITORS] Writing {batch_size} rows to s3://{cfg.s3_bucket_raw}/{visitors_key(cfg.s3_prefix_raw, target_day, mid, page)}"
             )
             put_jsonl_lines(
                 s3,
@@ -47,7 +48,7 @@ def handler(event, context):
                 key=visitors_key(cfg.s3_prefix_raw, target_day, mid, page),
                 rows=batch,
             )
-            if len(batch) < cfg.page_size:
+            if batch_size < cfg.page_size:
                 break
             page += 1
 
