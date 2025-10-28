@@ -1,4 +1,7 @@
 from __future__ import annotations
+
+import json
+
 import boto3
 from ingestion.http import WistiaClient
 from ingestion.settings import Settings
@@ -22,6 +25,8 @@ def handler(event, context):
         timeout_s=cfg.request_timeout_s,
     )
     s3 = boto3.client("s3")
+    iam = boto3.client("sts")
+    print("[ROLE] CallerIdentity:", json.dumps(iam.get_caller_identity()))
 
     summary = {"day": target_day.isoformat(), "media": []}
 
