@@ -26,7 +26,7 @@ class Settings:
             base_url=os.getenv("WISTIA_BASE_URL", "https://api.wistia.com/v1"),
             api_token=os.getenv("WISTIA_API_TOKEN", ""),  # empty in unit tests
             media_ids=_parse_list(os.getenv("MEDIA_IDS")),
-            s3_bucket_raw=os.getenv("S3_BUCKET_RAW", "my-bucket"),
+            s3_bucket_raw=os.getenv("S3_BUCKET_RAW", "kerok-wistia-raw"),
             s3_prefix_raw=os.getenv("S3_PREFIX_RAW", "raw/wistia"),
             ddb_table_watermark=os.getenv("DDB_TABLE_WATERMARK", "wistia_watermarks"),
             request_timeout_s=float(os.getenv("REQUEST_TIMEOUT_S", "15")),
