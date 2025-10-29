@@ -100,3 +100,13 @@ class WistiaClient:
             # Expect a JSON array; if the API returns an envelope, _request should already
             # normalize or you can add a small guard here if your _request is "raw".
         )
+
+    def medias_get(self, media_id: str) -> Dict[str, Any]:
+        """
+        GET /v1/medias/<media_id>
+        Returns the media object (dict).
+        """
+        data = self._request(f"medias/{media_id}", params={})
+        if not isinstance(data, dict):
+            raise WistiaError("Expected an object from /medias/<id>")
+        return data

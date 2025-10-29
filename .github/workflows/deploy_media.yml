@@ -1,0 +1,100 @@
+name: Deploy media ingest (Lambda)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "src/ingestion/lambda_media/**"
+      - ".github/workflows/deploy_media.yml"
+      - "pyproject.toml"
+      - "requirements*.txt"
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  LAMBDA_FUNCTION_NAME: kerok-wistia-media-ingest
+  # Keep these aligned with your Settings.from_env()
+  S3_BUCKET_RAW: kerok-wistia-raw
+  S3_PREFIX_RAW: raw/wistia
+  # Optional: use Names (not ARNs). Secrets contain token and/or ids.
+  WISTIA_SECRET_NAME: kerok/wistia/api
+  MEDIA_IDS_SECRET_NAME: kerok/wistia/media_ids
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::644171584843:role/gh-oidc-wistia-deployer
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps for Lambda layer (slim)
+        run: |
+          python -m pip install --upgrade pip
+          mkdir -p package
+          # If you keep Lambda deps minimal, you may skip installing anything here.
+          # If your handler needs 3rd-party libs not in AWS base runtime, vendor them:
+          # pip install -r requirements-lambda.txt -t package
+
+      - name: Build artifact (zip)
+        run: |
+          mkdir -p build
+          # Package only the ingestion package to keep zip small
+          rsync -a --prune-empty-dirs \
+            --include "src/" \
+            --include "src/ingestion/***" \
+            --exclude "*" \
+            . build/
+          (cd build/src && zip -r ../../lambda.zip ingestion)
+
+      - name: Update Lambda code
+        run: |
+          aws lambda update-function-code \
+            --function-name "${LAMBDA_FUNCTION_NAME}" \
+            --zip-file "fileb://lambda.zip" \
+            --publish
+
+      # Optional: keep env configuration in AWS Console for parity with other Lambdas.
+      # If you prefer IaC-in-Git, uncomment this step.
+      # - name: Update Lambda environment (optional)
+      #   run: |
+      #     aws lambda update-function-configuration \
+      #       --function-name "${LAMBDA_FUNCTION_NAME}" \
+      #       --environment "Variables={S3_BUCKET_RAW=${S3_BUCKET_RAW},S3_PREFIX_RAW=${S3_PREFIX_RAW},WISTIA_SECRET_NAME=${WISTIA_SECRET_NAME},MEDIA_IDS_SECRET_NAME=${MEDIA_IDS_SECRET_NAME}}"
+
+      - name: Smoke test (invoke Lambda)
+        env:
+          # Provide a single known media id (or comma-list via secret). This is only to validate permissions & basic pathing.
+          TEST_MEDIA_ID: gskhw4w4lm
+        run: |
+          PAYLOAD=$(jq -n --arg mid "$TEST_MEDIA_ID" '{media_ids: [$mid]}')
+          OUT=$(aws lambda invoke \
+            --function-name "${LAMBDA_FUNCTION_NAME}" \
+            --payload "$PAYLOAD" \
+            --cli-binary-format raw-in-base64-out \
+            --log-type Tail \
+            --query 'LogResult' \
+            --output text \
+            /dev/null | base64 --decode)
+          echo "---- Last logs ----"
+          echo "$OUT"
+
+          # Fail the job if Lambda returned FunctionError (non-zero handled by set -e)
+          # Also do a cheap S3 head check for the expected key
+          DAY=$(date -u +%F)
+          KEY="${S3_PREFIX_RAW%/}/media/dt=${DAY}/media_id=${TEST_MEDIA_ID}/object.json"
+          aws s3api head-object --bucket "${S3_BUCKET_RAW}" --key "${KEY}"
