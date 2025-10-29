@@ -29,7 +29,8 @@ env:
 jobs:
   # Regular deploy to prod for pushes to main/master
   deploy:
-    if: github.event_name == 'push'
+    environment: kerok-vistia-env
+    if: ${{ toJSON(vars.ENABLE_DEPLOY) == '"true"' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,10 +38,32 @@ jobs:
       - name: Configure AWS (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::644171584843:role/gh-oidc-wistia-deployer
-          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ vars.GH_OIDC_ROLE }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
 
-      # …build package, zip, update-function-code…
+      - name: Build deployment zip
+        run: |
+          set -e
+          rm -rf build lambda_media.zip
+          python -m pip install -U pip
+          pip install -r lambda_requirements.txt -t build
+          mkdir -p build_tmp
+          cp -r src/* build_tmp/
+          cp -r build/* build_tmp/
+          (cd build_tmp && zip -r ../lambda_media.zip .)
+          ls -lh lambda_media.zip
+
+      - name: Who am I?
+        run: aws sts get-caller-identity
+
+      - name: Update code
+        env:
+          LAMBDA_NAME: ${{ vars.LAMBDA_MEDIA_NAME }}
+        run: |
+          aws lambda update-function-code \
+            --function-name "$LAMBDA_NAME" \
+            --zip-file fileb://lambda_media.zip \
+            --publish
 
       - name: Smoke test (prod)
         run: |
