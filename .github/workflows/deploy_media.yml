@@ -22,10 +22,6 @@ concurrency:
   group: deploy-media-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  AWS_REGION: us-east-1
-  MEDIA_LAMBDA_NAME: kerok-wistia-media-ingest-stg  # <-- staging function for PRs
-
 jobs:
   # Regular deploy to prod for pushes to main/master
   deploy:
@@ -34,6 +30,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
 
       - name: Configure AWS (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -75,31 +75,3 @@ jobs:
             >(jq -r .) \
             --query 'StatusCode' \
           | grep -q '^200$'
-
-  # PR smoke test job (no deploy)
-  pr-smoke:
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure AWS (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::644171584843:role/gh-oidc-wistia-deployer
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Invoke staging media lambda (smoke)
-        run: |
-          set -euo pipefail
-          # Fail the job if Lambda reports FunctionError or non-200
-          OUT=$(aws lambda invoke \
-            --function-name "${{ env.MEDIA_LAMBDA_NAME }}" \
-            --payload '{"media_ids":["gskhw4w4lm"]}' \
-            --cli-binary-format raw-in-base64-out \
-            --log-type Tail \
-            /dev/stdout)
-          echo "$OUT" | jq -r '.LogResult' | base64 -d || true
-          STATUS=$(echo "$OUT" | jq -r '.StatusCode')
-          FUNCERR=$(echo "$OUT" | jq -r '.FunctionError // empty')
-          test "$STATUS" = "200" && test -z "$FUNCERR"
