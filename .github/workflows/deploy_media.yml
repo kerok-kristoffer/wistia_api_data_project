@@ -65,13 +65,60 @@ jobs:
             --zip-file fileb://lambda_media.zip \
             --publish
 
-      - name: Smoke test (prod)
+      - name: Smoke invoke (media)
+        env:
+          LAMBDA_NAME: ${{ vars.LAMBDA_MEDIA_NAME }}
+          MEDIA_IDS: ${{ vars.MEDIA_IDS_FOR_SMOKE || '' }}
         run: |
-          aws lambda invoke \
-            --function-name kerok-wistia-media-ingest \
-            --payload '{"media_ids":["gskhw4w4lm"]}' \
+          set -euo pipefail
+
+          if [ -n "${MEDIA_IDS}" ]; then
+            PAYLOAD=$(jq -nc --arg mids "$MEDIA_IDS" '{media_ids: ($mids|split(","))}')
+          else
+            PAYLOAD='{"media_ids":["gskhw4w4lm"]}'
+          fi
+
+          ENVELOPE=$(aws lambda invoke \
+            --function-name "$LAMBDA_NAME" \
+            --payload "$PAYLOAD" \
             --cli-binary-format raw-in-base64-out \
             --log-type Tail \
-            >(jq -r .) \
-            --query 'StatusCode' \
-          | grep -q '^200$'
+            --no-cli-pager \
+            out.json \
+            --query '{StatusCode:StatusCode,FunctionError:FunctionError,LogResult:LogResult}' \
+            --output json)
+
+          echo "Invoke envelope:"
+          echo "$ENVELOPE" | jq .
+
+          ERR=$(echo "$ENVELOPE" | jq -r '.FunctionError // ""')
+          SC=$(echo "$ENVELOPE" | jq -r '.StatusCode // empty')
+          LOGS=$(echo "$ENVELOPE" | jq -r '.LogResult // ""' | base64 -d || true)
+
+          # Print logs if present
+          if [ -n "$LOGS" ]; then
+            echo "---- Lambda logs ----"
+            echo "$LOGS"
+            echo "---------------------"
+          fi
+
+          # Fail on non-200 or any FunctionError
+          if [ "$SC" != "200" ]; then
+            echo "Smoke test failed: non-200 StatusCode ($SC)"
+            exit 1
+          fi
+          if [ -n "$ERR" ] && [ "$ERR" != "null" ]; then
+            echo "Smoke test failed: FunctionError=$ERR"
+            echo "---- Lambda response body ----"
+            cat out.json | jq . || cat out.json
+            exit 1
+          fi
+
+          # Optional: basic payload sanity check
+          jq -e 'type=="object" or type=="array"' out.json >/dev/null || {
+            echo "Unexpected payload type from Lambda"
+            cat out.json
+            exit 1
+          }
+
+          echo "Smoke test passed."
