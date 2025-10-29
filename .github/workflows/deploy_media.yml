@@ -63,7 +63,7 @@ jobs:
       - name: Configure AWS (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::<ACCOUNT_ID>:role/gh-oidc-wistia-deployer
+          role-to-assume: arn:aws:iam::644171584843:role/gh-oidc-wistia-deployer
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Invoke staging media lambda (smoke)
