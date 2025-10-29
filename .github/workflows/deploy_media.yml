@@ -68,19 +68,12 @@ jobs:
       - name: Smoke invoke (media)
         env:
           LAMBDA_NAME: ${{ vars.LAMBDA_MEDIA_NAME }}
-          MEDIA_IDS: ${{ vars.MEDIA_IDS_FOR_SMOKE || '' }}
         run: |
           set -euo pipefail
 
-          if [ -n "${MEDIA_IDS}" ]; then
-            PAYLOAD=$(jq -nc --arg mids "$MEDIA_IDS" '{media_ids: ($mids|split(","))}')
-          else
-            PAYLOAD='{"media_ids":["gskhw4w4lm"]}'
-          fi
-
           ENVELOPE=$(aws lambda invoke \
             --function-name "$LAMBDA_NAME" \
-            --payload "$PAYLOAD" \
+            --payload '{}' \
             --cli-binary-format raw-in-base64-out \
             --log-type Tail \
             --no-cli-pager \
