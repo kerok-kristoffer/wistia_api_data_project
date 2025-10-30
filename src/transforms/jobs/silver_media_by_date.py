@@ -1,17 +1,11 @@
 import argparse
 import sys
 
-from pyspark.sql import SparkSession, DataFrame
+from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.types import DateType, LongType, DoubleType
 
-
-def _build_spark():
-    return (
-        SparkSession.builder.appName("silver-wistia-media-by-date")
-        .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
-        .getOrCreate()
-    )
+from transforms.utils.spark import build_spark
 
 
 def _input_glob(input_uri: str, day: str) -> str:
@@ -108,7 +102,7 @@ def main(argv=None):
     ap.add_argument("--day", required=True, help="YYYY-MM-DD")
     args = ap.parse_args(argv or sys.argv[1:])
 
-    spark = _build_spark()
+    spark = build_spark("silver-wistia-media-by-date")
     src = _input_glob(args.input_uri, args.day)
     try:
         df = spark.read.json(src)

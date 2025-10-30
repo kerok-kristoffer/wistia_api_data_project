@@ -5,30 +5,16 @@ import os
 import sys
 from typing import Optional
 
-from pyspark.sql import SparkSession, DataFrame
+from pyspark.sql import DataFrame
 from pyspark.sql import functions as F
 from pyspark.sql.types import StringType, DoubleType
 
 from transforms.utils.ip_hash import hmac_sha256_hex
+from transforms.utils.spark import build_spark
 
 
 def _build_spark():
-    return (
-        SparkSession.builder.appName("silver-wistia-…")
-        .config("spark.sql.sources.partitionOverwriteMode", "dynamic")
-        # S3A filesystem + default creds chain (reads ~/.aws/credentials)
-        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-        .config(
-            "spark.hadoop.fs.s3a.aws.credentials.provider",
-            "com.amazonaws.auth.DefaultAWSCredentialsProviderChain",
-        )
-        # Pull the S3 jars automatically:
-        .config(
-            "spark.jars.packages",
-            "org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262",
-        )
-        .getOrCreate()
-    )
+    return build_spark("silver-wistia-events")
 
 
 def _resolve_ip_key(cli_key: Optional[str]) -> Optional[str]:
