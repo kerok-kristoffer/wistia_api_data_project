@@ -55,7 +55,7 @@ def test_silver_visitors_typing_partitioning_and_dedup(
         ],
     )
 
-    in_uri = f"file://{base}/raw/wistia"
+    in_uri = f"file://{base}/raw/wistia/visitors"
     out_uri = f"file://{base}/silver/wistia"
 
     # Act
