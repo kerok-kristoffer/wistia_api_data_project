@@ -52,6 +52,7 @@ def handler(event, context):
                 break
             page += 1
 
+        print(f"[VISITORS] Total written rows for media_id={mid}: {rows_total}")
         summary["media"].append({"media_id": mid, "rows": rows_total})
 
     return summary
