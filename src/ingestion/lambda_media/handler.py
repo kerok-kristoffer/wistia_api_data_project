@@ -23,7 +23,7 @@ def _parse_date(val: str | None, default: date) -> date:
 
 def _media_key(prefix: str, day: date, media_id: str) -> str:
     # raw/wistia/media/dt=YYYY-MM-DD/media_id=<id>/object.json
-    return f"{prefix.rstrip('/')}/media/dt={day.isoformat()}/media_id={media_id}/object.json"
+    return f"{prefix.rstrip('/')}/dt={day.isoformat()}/media_id={media_id}/object.json"
 
 
 def handler(event, context):

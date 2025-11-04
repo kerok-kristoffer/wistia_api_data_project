@@ -1,0 +1,7 @@
+{
+  "--job-language": "python",
+  "--extra-py-files": "s3://kerok-wistia-code/wistia/transforms/transforms_src.zip",
+  "--input-uri": "s3://kerok-wistia-raw/wistia",
+  "--output-uri": "s3://kerok-wistia-silver/wistia",
+  "--day": "2025-09-06"
+}

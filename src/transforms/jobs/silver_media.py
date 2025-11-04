@@ -9,9 +9,47 @@ from pyspark.sql.functions import (
     to_date,
     lit,
 )
-import argparse
 
-from transforms.utils.spark import build_spark
+import argparse
+from typing import Dict, Optional
+
+
+def build_spark(
+    app_name: str,
+    *,
+    use_s3a: bool = True,
+    extra_confs: Optional[Dict[str, str]] = None,
+) -> SparkSession:
+    """
+    Standardized SparkSession:
+      - dynamic partition overwrite
+      - S3A filesystem + default AWS creds chain (OIDC / instance / env / ~/.aws)
+      - Optional extra configs per job
+    """
+    builder = SparkSession.builder.appName(app_name).config(
+        "spark.sql.sources.partitionOverwriteMode", "dynamic"
+    )
+
+    if use_s3a:
+        builder = (
+            builder.config(
+                "spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem"
+            )
+            .config(
+                "spark.hadoop.fs.s3a.aws.credentials.provider",
+                "com.amazonaws.auth.DefaultAWSCredentialsProviderChain",
+            )
+            .config(
+                "spark.jars.packages",
+                "org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262",
+            )
+        )
+
+    if extra_confs:
+        for k, v in extra_confs.items():
+            builder = builder.config(k, v)
+
+    return builder.getOrCreate()
 
 
 def read_raw(spark: SparkSession, input_uri: str, day: str) -> DataFrame:
@@ -68,9 +106,21 @@ def run_job(args_list=None):
     parser.add_argument(
         "--no-snapshot", action="store_true", help="Skip snapshot write"
     )
-    args = parser.parse_args(args_list)
+
+    # Let Glue’s own flags (like --JOB_NAME, --enable-metrics, etc.) pass through
+    args, unknown = parser.parse_known_args(args_list)
+    if unknown:
+        print(f"[silver_media] Ignoring unknown args from Glue: {unknown}")
 
     spark = build_spark("silver-wistia-media")
+    raw = read_raw(spark, args.input_uri, args.day)
+    if raw.rdd.isEmpty():
+        return
+
+    proj = project(raw)
+    write_history(proj, args.output_uri, args.day)
+    if not args.no_snapshot:
+        write_snapshot(proj, args.output_uri)
     raw = read_raw(spark, args.input_uri, args.day)
     if raw.rdd.isEmpty():
         return
