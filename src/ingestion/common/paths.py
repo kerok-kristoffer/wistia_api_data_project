@@ -7,4 +7,4 @@ def events_key(prefix: str, day: date, media_id: str, page: int) -> str:
 
 
 def visitors_key(prefix: str, day: date, media_id: str, page: int) -> str:
-    return f"{prefix.rstrip('/')}/visitors/dt={day.isoformat()}/media_id={media_id}/page={page:04d}.jsonl"
+    return f"{prefix.rstrip('/')}/dt={day.isoformat()}/media_id={media_id}/page={page:04d}.jsonl"
