@@ -1,0 +1,87 @@
+name: Deploy Step Function (Silver) + Schedule
+
+on:
+  push:
+    paths:
+      - ".github/workflows/deploy-stepfn-silver.yml"
+      - "src/infra/stepfn/silver_state_machine.json"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-stepfn:
+    environment: kerok-vistia-env
+    if: ${{ toJSON(vars.ENABLE_DEPLOY) == '"true"' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ vars.GH_OIDC_ROLE }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Create/Update state machine
+        env:
+          SM_NAME: kerok-wistia-daily-pipeline
+          ASL_FILE: src/infra/stepfn/silver_state_machine.json
+        run: |
+          # Look for an existing state machine with this name
+          ARN=$(aws stepfunctions list-state-machines \
+            --query "stateMachines[?name=='$SM_NAME'].stateMachineArn" \
+            --output text || true)
+
+          if [ -z "$ARN" ] || [ "$ARN" == "None" ]; then
+            echo "No existing state machine named $SM_NAME, creating a new one..."
+
+            ARN=$(aws stepfunctions create-state-machine \
+              --name "$SM_NAME" \
+              --role-arn "arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ vars.STEPFN_ROLE_NAME }}" \
+              --definition file://$ASL_FILE \
+              --type STANDARD \
+              --query 'stateMachineArn' \
+              --output text)
+
+          else
+            echo "Updating existing state machine $SM_NAME ($ARN)..."
+
+            # Update only the definition; keep existing role & tracing configuration
+            aws stepfunctions update-state-machine \
+              --state-machine-arn "$ARN" \
+              --definition file://$ASL_FILE
+          fi
+
+          echo "STATE_MACHINE_ARN=$ARN" >> "$GITHUB_ENV"
+
+      - name: Create/Update daily EventBridge rule (DISABLED for now)
+        env:
+          RULE_NAME: kerok-wistia-daily
+          STARTER_LAMBDA_NAME: kerok-wistia-daily-pipeline-starter
+        run: |
+          # 02:00 UTC daily
+          SCHEDULE="cron(0 2 * * ? *)"
+
+          echo "Creating/updating EventBridge rule $RULE_NAME (state=DISABLED)..."
+          aws events put-rule \
+            --name "$RULE_NAME" \
+            --schedule-expression "$SCHEDULE" \
+            --state DISABLED
+
+          # Attach the starter Lambda as target (no special input needed yet)
+          aws events put-targets \
+            --rule "$RULE_NAME" \
+            --targets "Id=1,Arn=arn:aws:lambda:${{ vars.AWS_REGION || 'us-east-1' }}:${{ vars.AWS_ACCOUNT_ID }}:function:$STARTER_LAMBDA_NAME"
+
+          # Allow EventBridge to invoke the Lambda (idempotent-ish)
+          aws lambda add-permission \
+            --function-name "$STARTER_LAMBDA_NAME" \
+            --statement-id "AllowEventBridgeInvokeDaily" \
+            --action "lambda:InvokeFunction" \
+            --principal "events.amazonaws.com" \
+            --source-arn "arn:aws:events:${{ vars.AWS_REGION || 'us-east-1' }}:${{ vars.AWS_ACCOUNT_ID }}:rule/$RULE_NAME" \
+            || true
