@@ -4,7 +4,7 @@ on:
   push:
     paths:
       - ".github/workflows/deploy-stepfn-silver.yml"
-      - "infra/stepfn/silver_state_machine.json"
+      - "src/infra/stepfn/silver_state_machine.json"
   workflow_dispatch:
 
 permissions:
@@ -29,7 +29,7 @@ jobs:
       - name: Create/Update state machine
         env:
           SM_NAME: kerok-wistia-daily-pipeline
-          ASL_FILE: infra/stepfn/silver_state_machine.json
+          ASL_FILE: src/infra/stepfn/silver_state_machine.json
         run: |
           # Look for an existing state machine with this name
           ARN=$(aws stepfunctions list-state-machines \
