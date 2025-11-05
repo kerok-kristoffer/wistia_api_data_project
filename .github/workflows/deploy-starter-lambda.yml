@@ -69,5 +69,6 @@ jobs:
             echo "Updating environment variables for Lambda $LAMBDA_NAME..."
             aws lambda update-function-configuration \
               --function-name "$LAMBDA_NAME" \
-              --environment "Variables={STATE_MACHINE_NAME=kerok-wistia-bronze-silver,AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID }},AWS_REGION=${{ vars.AWS_REGION || 'us-east-1' }}}"
+              --environment "Variables={STATE_MACHINE_NAME=kerok-wistia-daily-pipeline,AWS_ACCOUNT_ID=${{ vars.AWS_ACCOUNT_ID }}}"
+
           fi
