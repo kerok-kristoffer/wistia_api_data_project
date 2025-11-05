@@ -1,0 +1,352 @@
+{
+  "Comment": "Wistia daily pipeline for a single day",
+  "StartAt": "MarkPipelineStart",
+  "States": {
+    "MarkPipelineStart": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:putItem",
+      "Parameters": {
+        "TableName": "kerok-wistia-watermarks",
+        "Item": {
+          "run_date": {
+            "S.$": "States.Format('day#{}', $$.Execution.Input.day)"
+          },
+          "data_in_process": {
+            "S": "PIPELINE"
+          },
+          "status": {
+            "S": "STARTED"
+          },
+          "updated_at": {
+            "S.$": "$$.State.EnteredTime"
+          }
+        }
+      },
+      "Next": "RawIngest"
+    },
+    "RawIngest": {
+      "Type": "Parallel",
+      "Branches": [
+        {
+          "StartAt": "RawMedia",
+          "States": {
+            "RawMedia": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:644171584843:function:kerok-wistia-media-ingest",
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException"
+                  ],
+                  "IntervalSeconds": 5,
+                  "MaxAttempts": 3,
+                  "BackoffRate": 2
+                }
+              ],
+              "ResultPath": "$.rawMedia",
+              "Next": "LogRawMediaSuccess",
+              "Catch": [
+                {
+                  "ErrorEquals": [
+                    "States.ALL"
+                  ],
+                  "ResultPath": "$.rawMediaError",
+                  "Next": "LogRawMediaFailure"
+                }
+              ]
+            },
+            "LogRawMediaSuccess": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::dynamodb:putItem",
+              "Parameters": {
+                "TableName": "kerok-wistia-watermarks",
+                "Item": {
+                  "run_date": {
+                    "S.$": "States.Format('day#{}', $$.Execution.Input.day)"
+                  },
+                  "data_in_process": {
+                    "S": "RAW_MEDIA"
+                  },
+                  "status": {
+                    "S": "SUCCEEDED"
+                  },
+                  "updated_at": {
+                    "S.$": "$$.State.EnteredTime"
+                  }
+                }
+              },
+              "End": true
+            },
+            "LogRawMediaFailure": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::dynamodb:putItem",
+              "Parameters": {
+                "TableName": "kerok-wistia-watermarks",
+                "Item": {
+                  "run_date": {
+                    "S.$": "States.Format('day#{}', $$.Execution.Input.day)"
+                  },
+                  "data_in_process": {
+                    "S": "RAW_MEDIA"
+                  },
+                  "status": {
+                    "S": "FAILED"
+                  },
+                  "updated_at": {
+                    "S.$": "$$.State.EnteredTime"
+                  }
+                }
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "RawVisitors",
+          "States": {
+            "RawVisitors": {
+              "Type": "Task",
+              "Resource": "arn:aws:lambda:us-east-1:644171584843:function:kerok-wistia-visitors-ingest",
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException"
+                  ],
+                  "IntervalSeconds": 5,
+                  "MaxAttempts": 3,
+                  "BackoffRate": 2
+                }
+              ],
+              "ResultPath": "$.rawVisitors",
+              "Next": "LogRawVisitorsSuccess",
+              "Catch": [
+                {
+                  "ErrorEquals": [
+                    "States.ALL"
+                  ],
+                  "ResultPath": "$.rawVisitorsError",
+                  "Next": "LogRawVisitorsFailure"
+                }
+              ]
+            },
+            "LogRawVisitorsSuccess": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::dynamodb:putItem",
+              "Parameters": {
+                "TableName": "kerok-wistia-watermarks",
+                "Item": {
+                  "run_date": {
+                    "S.$": "States.Format('day#{}', $$.Execution.Input.day)"
+                  },
+                  "data_in_process": {
+                    "S": "RAW_VISITORS"
+                  },
+                  "status": {
+                    "S": "SUCCEEDED"
+                  },
+                  "updated_at": {
+                    "S.$": "$$.State.EnteredTime"
+                  }
+                }
+              },
+              "End": true
+            },
+            "LogRawVisitorsFailure": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::dynamodb:putItem",
+              "Parameters": {
+                "TableName": "kerok-wistia-watermarks",
+                "Item": {
+                  "run_date": {
+                    "S.$": "States.Format('day#{}', $$.Execution.Input.day)"
+                  },
+                  "data_in_process": {
+                    "S": "RAW_VISITORS"
+                  },
+                  "status": {
+                    "S": "FAILED"
+                  },
+                  "updated_at": {
+                    "S.$": "$$.State.EnteredTime"
+                  }
+                }
+              },
+              "End": true
+            }
+          }
+        }
+      ],
+      "Next": "SilverTransforms"
+    },
+    "SilverTransforms": {
+      "Type": "Parallel",
+      "Branches": [
+        {
+          "StartAt": "SilverMedia",
+          "States": {
+            "SilverMedia": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun.sync",
+              "Parameters": {
+                "JobName": "wistia-silver-media",
+                "Arguments": {
+                  "--day.$": "$$.Execution.Input.day"
+                }
+              },
+              "Next": "LogSilverMediaSuccess",
+              "Catch": [
+                {
+                  "ErrorEquals": [
+                    "States.ALL"
+                  ],
+                  "ResultPath": "$.silverMediaError",
+                  "Next": "LogSilverMediaFailure"
+                }
+              ]
+            },
+            "LogSilverMediaSuccess": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::dynamodb:putItem",
+              "Parameters": {
+                "TableName": "kerok-wistia-watermarks",
+                "Item": {
+                  "run_date": {
+                    "S.$": "States.Format('day#{}', $$.Execution.Input.day)"
+                  },
+                  "data_in_process": {
+                    "S": "SILVER_MEDIA"
+                  },
+                  "status": {
+                    "S": "SUCCEEDED"
+                  },
+                  "updated_at": {
+                    "S.$": "$$.State.EnteredTime"
+                  }
+                }
+              },
+              "End": true
+            },
+            "LogSilverMediaFailure": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::dynamodb:putItem",
+              "Parameters": {
+                "TableName": "kerok-wistia-watermarks",
+                "Item": {
+                  "run_date": {
+                    "S.$": "States.Format('day#{}', $$.Execution.Input.day)"
+                  },
+                  "data_in_process": {
+                    "S": "SILVER_MEDIA"
+                  },
+                  "status": {
+                    "S": "FAILED"
+                  },
+                  "updated_at": {
+                    "S.$": "$$.State.EnteredTime"
+                  }
+                }
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "SilverVisitors",
+          "States": {
+            "SilverVisitors": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun.sync",
+              "Parameters": {
+                "JobName": "wistia-silver-visitors",
+                "Arguments": {
+                  "--day.$": "$$.Execution.Input.day"
+                }
+              },
+              "Next": "LogSilverVisitorsSuccess",
+              "Catch": [
+                {
+                  "ErrorEquals": [
+                    "States.ALL"
+                  ],
+                  "ResultPath": "$.silverVisitorsError",
+                  "Next": "LogSilverVisitorsFailure"
+                }
+              ]
+            },
+            "LogSilverVisitorsSuccess": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::dynamodb:putItem",
+              "Parameters": {
+                "TableName": "kerok-wistia-watermarks",
+                "Item": {
+                  "run_date": {
+                    "S.$": "States.Format('day#{}', $$.Execution.Input.day)"
+                  },
+                  "data_in_process": {
+                    "S": "SILVER_VISITORS"
+                  },
+                  "status": {
+                    "S": "SUCCEEDED"
+                  },
+                  "updated_at": {
+                    "S.$": "$$.State.EnteredTime"
+                  }
+                }
+              },
+              "End": true
+            },
+            "LogSilverVisitorsFailure": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::dynamodb:putItem",
+              "Parameters": {
+                "TableName": "kerok-wistia-watermarks",
+                "Item": {
+                  "run_date": {
+                    "S.$": "States.Format('day#{}', $$.Execution.Input.day)"
+                  },
+                  "data_in_process": {
+                    "S": "SILVER_VISITORS"
+                  },
+                  "status": {
+                    "S": "FAILED"
+                  },
+                  "updated_at": {
+                    "S.$": "$$.State.EnteredTime"
+                  }
+                }
+              },
+              "End": true
+            }
+          }
+        }
+      ],
+      "Next": "MarkPipelineSuccess"
+    },
+    "MarkPipelineSuccess": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:putItem",
+      "Parameters": {
+        "TableName": "kerok-wistia-watermarks",
+        "Item": {
+          "run_date": {
+            "S.$": "States.Format('day#{}', $$.Execution.Input.day)"
+          },
+          "data_in_process": {
+            "S": "PIPELINE"
+          },
+          "status": {
+            "S": "SUCCEEDED"
+          },
+          "updated_at": {
+            "S.$": "$$.State.EnteredTime"
+          }
+        }
+      },
+      "End": true
+    }
+  }
+}

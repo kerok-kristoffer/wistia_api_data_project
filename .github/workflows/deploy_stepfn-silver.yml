@@ -1,4 +1,4 @@
-name: Deploy Step Functions (Silver) + Schedule
+name: Deploy Step Function (Silver) + Schedule
 
 on:
   push:
@@ -16,6 +16,7 @@ jobs:
     environment: kerok-vistia-env
     if: ${{ toJSON(vars.ENABLE_DEPLOY) == '"true"' }}
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -27,54 +28,60 @@ jobs:
 
       - name: Create/Update state machine
         env:
-          SM_NAME: kerok-wistia-bronze-silver
-          EMR_APP_ID: ${{ vars.EMR_APP_ID }}
-          EMR_JOB_ROLE_ARN: ${{ vars.EMR_JOB_ROLE_ARN }}
-          LAMBDA_VISITORS: ${{ vars.LAMBDA_VISITORS_NAME }}
-          LAMBDA_MEDIA: ${{ vars.LAMBDA_MEDIA_NAME }}
-          RAW_URI: ${{ vars.RAW_URI }}
-          SILVER_URI: ${{ vars.SILVER_URI }}
-          LOGS_URI: ${{ vars.LOGS_URI || 's3://kerok-wistia-logs/emr/' }}
+          SM_NAME: kerok-wistia-daily-pipeline
+          ASL_FILE: infra/stepfn/silver_state_machine.json
         run: |
-          # Read the ASL template and output ARN in a file:
-          ASL_FILE="infra/stepfn/silver_state_machine.json"
+          # Look for an existing state machine with this name
+          ARN=$(aws stepfunctions list-state-machines \
+            --query "stateMachines[?name=='$SM_NAME'].stateMachineArn" \
+            --output text || true)
 
-          # Create or update the state machine
-          ARN=$(aws stepfunctions list-state-machines --query "stateMachines[?name=='$SM_NAME'].stateMachineArn" --output text || true)
           if [ -z "$ARN" ] || [ "$ARN" == "None" ]; then
+            echo "No existing state machine named $SM_NAME, creating a new one..."
+
             ARN=$(aws stepfunctions create-state-machine \
               --name "$SM_NAME" \
-              --role-arn "arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/stepfn-service-role" \
+              --role-arn "arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ vars.STEPFN_ROLE_NAME }}" \
               --definition file://$ASL_FILE \
               --type STANDARD \
-              --query 'stateMachineArn' --output text)
+              --query 'stateMachineArn' \
+              --output text)
+
           else
+            echo "Updating existing state machine $SM_NAME ($ARN)..."
+
+            # Update only the definition; keep existing role & tracing configuration
             aws stepfunctions update-state-machine \
               --state-machine-arn "$ARN" \
-              --definition file://$ASL_FILE \
-              --no-tracing
+              --definition file://$ASL_FILE
           fi
-          echo "STATE_MACHINE_ARN=$ARN" >> $GITHUB_ENV
 
-      - name: Create/Update daily EventBridge rule
+          echo "STATE_MACHINE_ARN=$ARN" >> "$GITHUB_ENV"
+
+      - name: Create/Update daily EventBridge rule (DISABLED for now)
         env:
           RULE_NAME: kerok-wistia-daily
-          STATE_MACHINE_ARN: ${{ env.STATE_MACHINE_ARN }}
+          STARTER_LAMBDA_NAME: kerok-wistia-daily-pipeline-starter
         run: |
-          # 02:00 UTC daily (adjust as needed)
+          # 02:00 UTC daily
           SCHEDULE="cron(0 2 * * ? *)"
 
-          aws events put-rule --name "$RULE_NAME" --schedule-expression "$SCHEDULE"
+          echo "Creating/updating EventBridge rule $RULE_NAME (state=DISABLED)..."
+          aws events put-rule \
+            --name "$RULE_NAME" \
+            --schedule-expression "$SCHEDULE" \
+            --state DISABLED
 
-          # Allow Events to start executions
+          # Attach the starter Lambda as target (no special input needed yet)
           aws events put-targets \
             --rule "$RULE_NAME" \
-            --targets "Id"="1","Arn"="$STATE_MACHINE_ARN","RoleArn"="arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/events-to-stepfn-role","Input"='{
-              "lambda_visitors_name": "'"${{ vars.LAMBDA_VISITORS_NAME }}"'",
-              "lambda_media_name": "'"${{ vars.LAMBDA_MEDIA_NAME }}"'",
-              "raw_uri": "'"${{ vars.RAW_URI }}"'",
-              "silver_uri": "'"${{ vars.SILVER_URI }}"'",
-              "emr_app_id": "'"${{ vars.EMR_APP_ID }}"'",
-              "emr_job_role_arn": "'"${{ vars.EMR_JOB_ROLE_ARN }}"'",
-              "logs_uri": "'"${{ vars.LOGS_URI || 's3://kerok-wistia-logs/emr/' }}"'"
-            }'
+            --targets "Id=1,Arn=arn:aws:lambda:${{ vars.AWS_REGION || 'us-east-1' }}:${{ vars.AWS_ACCOUNT_ID }}:function:$STARTER_LAMBDA_NAME"
+
+          # Allow EventBridge to invoke the Lambda (idempotent-ish)
+          aws lambda add-permission \
+            --function-name "$STARTER_LAMBDA_NAME" \
+            --statement-id "AllowEventBridgeInvokeDaily" \
+            --action "lambda:InvokeFunction" \
+            --principal "events.amazonaws.com" \
+            --source-arn "arn:aws:events:${{ vars.AWS_REGION || 'us-east-1' }}:${{ vars.AWS_ACCOUNT_ID }}:rule/$RULE_NAME" \
+            || true
