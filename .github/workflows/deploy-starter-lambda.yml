@@ -3,7 +3,7 @@ name: Deploy Starter Lambda
 on:
   push:
     paths:
-      - ".github/workflows/deploy_starter_lambda.yml"
+      - ".github/workflows/deploy-starter-lambda.yml"
       - "src/infra/starter/**"
   workflow_dispatch:
 
