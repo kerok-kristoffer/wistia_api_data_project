@@ -29,8 +29,8 @@ jobs:
       - name: Package Lambda
         run: |
           mkdir -p build
-          cd infra/starter
-          zip -r ../../build/starter_lambda.zip .
+          cd src/infra/starter
+          zip -r ../../../build/starter_lambda.zip .
           cd -
 
       - name: Create/Update Lambda function
