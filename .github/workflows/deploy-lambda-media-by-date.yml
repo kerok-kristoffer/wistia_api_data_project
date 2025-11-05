@@ -57,7 +57,7 @@ jobs:
             --publish
 
       - name: Smoke invoke
-        if: ${{ vars.LAMBDA_NAME_EVENTS || 'ingestion-starter-events' }}
+        if: ${{ vars.LAMBDA_NAME_EVENTS || 'ingestion-lambda-events' }}
         env:
           LAMBDA_NAME: ${{ vars.LAMBDA_EVENTS_NAME }}
         run: |
