@@ -28,6 +28,7 @@ jobs:
 
       - name: Package Lambda
         run: |
+          echo "Packaging Starter Lambda..."
           mkdir -p build
           cd src/infra/starter
           zip -r ../../../build/starter_lambda.zip .
