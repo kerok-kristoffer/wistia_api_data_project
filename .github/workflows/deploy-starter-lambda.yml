@@ -61,6 +61,10 @@ jobs:
             aws lambda update-function-code \
               --function-name "$LAMBDA_NAME" \
               --zip-file "fileb://$ZIP_FILE"
+          
+            echo "Waiting for Lambda $LAMBDA_NAME to finish updating..."
+            aws lambda wait function-updated \
+              --function-name "$LAMBDA_NAME"
 
             echo "Updating environment variables for Lambda $LAMBDA_NAME..."
             aws lambda update-function-configuration \
