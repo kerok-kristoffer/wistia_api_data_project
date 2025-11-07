@@ -16,6 +16,10 @@ def handler(event, context):
     merge_wistia_secret_into_env(secret)
 
     cfg = Settings.from_env()
+
+    if "day" not in event:
+        raise ValueError("Missing 'day' in event; pipeline must always provide it.")
+
     target_day = parse_iso_date((event or {}).get("day"), _today_utc())
     media_ids = (event or {}).get("media_ids") or (cfg.media_ids or [])
 

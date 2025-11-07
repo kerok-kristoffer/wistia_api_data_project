@@ -22,6 +22,7 @@
           }
         }
       },
+      "ResultPath": null,
       "Next": "RawIngest"
     },
     "RawIngest": {
