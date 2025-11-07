@@ -52,7 +52,7 @@
                   "ErrorEquals": [
                     "States.ALL"
                   ],
-                  "ResultPath": "$.rawMediaError",
+                  "ResultPath": "$",
                   "Next": "LogRawMediaFailure"
                 }
               ]
@@ -128,7 +128,7 @@
                   "ErrorEquals": [
                     "States.ALL"
                   ],
-                  "ResultPath": "$.rawVisitorsError",
+                  "ResultPath": "$",
                   "Next": "LogRawVisitorsFailure"
                 }
               ]
@@ -203,7 +203,7 @@
                   "ErrorEquals": [
                     "States.ALL"
                   ],
-                  "ResultPath": "$.silverMediaError",
+                  "ResultPath": "$",
                   "Next": "LogSilverMediaFailure"
                 }
               ]
@@ -272,7 +272,7 @@
                   "ErrorEquals": [
                     "States.ALL"
                   ],
-                  "ResultPath": "$.silverVisitorsError",
+                  "ResultPath": "$",
                   "Next": "LogSilverVisitorsFailure"
                 }
               ]
