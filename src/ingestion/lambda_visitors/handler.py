@@ -21,6 +21,8 @@ def handler(event, context):
     if event.get("smoke_test"):
         print("[media-ingest] Smoke test mode: skipping ingestion.")
         return {"ok": True, "smoke_test": True}
+    if "day" not in event:
+        raise ValueError("Missing 'day' in event; pipeline must always provide it.")
 
     target_day = parse_iso_date((event or {}).get("day"), _today_utc())
     media_ids = (event or {}).get("media_ids") or (cfg.media_ids or [])
