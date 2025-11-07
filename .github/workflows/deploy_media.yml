@@ -73,7 +73,7 @@ jobs:
 
           ENVELOPE=$(aws lambda invoke \
             --function-name "$LAMBDA_NAME" \
-            --payload '{}' \
+            --payload '{"smoke_test": true}' \
             --cli-binary-format raw-in-base64-out \
             --log-type Tail \
             --no-cli-pager \

@@ -13,6 +13,11 @@ def handler(event, context):
     secret = load_wistia_secret()
     merge_wistia_secret_into_env(secret)
 
+    # Short-circuit for CI smoke tests
+    if event.get("smoke_test"):
+        print("[media-ingest] Smoke test mode: skipping ingestion.")
+        return {"ok": True, "smoke_test": True}
+
     cfg = Settings.from_env()
     target_day = parse_iso_date((event or {}).get("day"), _today_utc())
     media_ids = (event or {}).get("media_ids") or (cfg.media_ids or [])

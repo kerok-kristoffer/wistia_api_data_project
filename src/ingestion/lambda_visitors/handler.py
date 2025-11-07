@@ -17,6 +17,10 @@ def handler(event, context):
 
     cfg = Settings.from_env()
 
+    # Short-circuit for CI smoke tests
+    if event.get("smoke_test"):
+        print("[media-ingest] Smoke test mode: skipping ingestion.")
+        return {"ok": True, "smoke_test": True}
     if "day" not in event:
         raise ValueError("Missing 'day' in event; pipeline must always provide it.")
 

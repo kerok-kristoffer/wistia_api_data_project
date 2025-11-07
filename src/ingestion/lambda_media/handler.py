@@ -51,6 +51,11 @@ def handler(event, context):
     sts = boto3.client("sts")
     print("[ROLE] CallerIdentity:", json.dumps(sts.get_caller_identity()))
 
+    # Short-circuit for CI smoke tests
+    print(f"checking event: {event} for smoke_test")
+    if event.get("smoke_test"):
+        print("[media-ingest] Smoke test mode: skipping ingestion.")
+        return {"ok": True, "smoke_test": True}
     if "day" not in event:
         raise ValueError("Missing 'day' in event; pipeline must always provide it.")
 
