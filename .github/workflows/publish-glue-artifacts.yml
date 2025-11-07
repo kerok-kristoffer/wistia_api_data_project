@@ -5,7 +5,6 @@ on:
     paths:
       - "src/transforms/**"
       - "src/transforms/utils/**"
-      - "glue_wrappers/**"
       - ".github/workflows/publish-glue-artifacts.yml"
   workflow_dispatch:
 
@@ -43,7 +42,5 @@ jobs:
           CODE_PREFIX: ${{ vars.CODE_PREFIX }}
         run: |
           set -e
-          aws s3 cp glue_wrappers/silver_visitors_glue_driver.py s3://$CODE_BUCKET/$CODE_PREFIX/silver_visitors_glue_driver.py
-          aws s3 cp glue_wrappers/silver_media_glue_driver.py    s3://$CODE_BUCKET/$CODE_PREFIX/silver_media_glue_driver.py
           aws s3 cp transforms_src.zip                           s3://$CODE_BUCKET/$CODE_PREFIX/transforms_src.zip
           echo "Published to s3://$CODE_BUCKET/$CODE_PREFIX/"
