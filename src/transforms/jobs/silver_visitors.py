@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+from pyspark.errors import AnalysisException
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import (
     col,
@@ -124,7 +126,14 @@ def run_job(args_list=None):
         print(f"[silver_media] Ignoring unknown args from Glue: {unknown}")
 
     spark = build_spark("silver-wistia-media")
-    raw = read_raw(spark, args.input_uri, args.day)
+
+    try:
+        raw = read_raw(spark, args.input_uri, args.day)
+    except AnalysisException as e:
+        if "Path does not exist" in str(e):
+            print(f"[silver_visitors] No raw path for day={args.day}, skipping.")
+            return
+        raise
     if raw.rdd.isEmpty():
         return
 
