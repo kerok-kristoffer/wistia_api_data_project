@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from pyspark.errors import AnalysisException
+try:
+    from pyspark.errors import AnalysisException
+except ImportError:
+    from pyspark.sql.utils import AnalysisException
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import (
     col,
