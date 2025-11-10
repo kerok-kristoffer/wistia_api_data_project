@@ -1,0 +1,205 @@
+# .github/workflows/deploy-glue-jobs.yml
+name: Deploy Glue Jobs (Silver + Gold)
+
+on:
+  push:
+    paths:
+      - "src/transforms/jobs/**"
+      - ".github/workflows/deploy-glue-jobs.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-glue-jobs:
+    environment: kerok-vistia-env
+    if: ${{ toJSON(vars.ENABLE_DEPLOY) == '"true"' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/${{ vars.GH_OIDC_ROLE }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Upload Glue scripts to S3
+        env:
+          SCRIPT_BUCKET: ${{ vars.CODE_BUCKET }}
+          SCRIPT_PREFIX: ${{ vars.CODE_PREFIX }}
+        run: |
+          set -e
+
+          # Silver scripts
+          aws s3 cp src/transforms/jobs/silver-media.py \
+            "s3://$SCRIPT_BUCKET/$SCRIPT_PREFIX/wistia-silver-media.py"
+
+          aws s3 cp src/transforms/jobs/silver-visitors.py \
+            "s3://$SCRIPT_BUCKET/$SCRIPT_PREFIX/wistia-silver-visitors.py"
+
+          # Gold scripts
+          aws s3 cp src/transforms/jobs/gold-dim-media.py \
+            "s3://$SCRIPT_BUCKET/$SCRIPT_PREFIX/wistia-gold-dim-media.py"
+
+          aws s3 cp src/transforms/jobs/gold-fact-media-daily.py \
+            "s3://$SCRIPT_BUCKET/$SCRIPT_PREFIX/wistia-gold-fact-media-daily.py"
+
+      # --- Silver: wistia-silver-media ---
+      - name: Create/Update Glue job (silver media)
+        env:
+          GLUE_ROLE_ARN: ${{ vars.GLUE_ROLE_ARN }}
+          SCRIPT_BUCKET: ${{ vars.CODE_BUCKET }}
+          SCRIPT_PREFIX: ${{ vars.CODE_PREFIX }}
+          JOB_NAME: wistia-silver-media
+        run: |
+          set -e
+          SCRIPT_LOCATION="s3://$SCRIPT_BUCKET/$SCRIPT_PREFIX/wistia-silver-media.py"
+
+          EXISTING=$(aws glue get-job --job-name "$JOB_NAME" --query 'Job.Name' --output text 2>/dev/null || true)
+
+          if [ -z "$EXISTING" ] || [ "$EXISTING" == "None" ]; then
+            echo "Creating Glue job $JOB_NAME..."
+            aws glue create-job \
+              --name "$JOB_NAME" \
+              --role "$GLUE_ROLE_ARN" \
+              --command "Name=glueetl,ScriptLocation=$SCRIPT_LOCATION,PythonVersion=3" \
+              --default-arguments "{
+                \"--enable-metrics\":\"\",
+                \"--input-uri\":\"${{ vars.RAW_URI }}\",
+                \"--output-uri\":\"${{ vars.SILVER_URI }}\"
+              }"
+          else
+            echo "Updating Glue job $JOB_NAME..."
+            aws glue update-job \
+              --job-name "$JOB_NAME" \
+              --job-update "{
+                \"Role\": \"$GLUE_ROLE_ARN\",
+                \"Command\": {\"Name\":\"glueetl\",\"ScriptLocation\":\"$SCRIPT_LOCATION\",\"PythonVersion\":\"3\"},
+                \"DefaultArguments\": {
+                  \"--enable-metrics\":\"\",
+                  \"--input-uri\":\"${{ vars.RAW_URI }}\",
+                  \"--output-uri\":\"${{ vars.SILVER_URI }}\"
+                }
+              }"
+          fi
+
+      # --- Silver: wistia-silver-visitors ---
+      - name: Create/Update Glue job (silver visitors)
+        env:
+          GLUE_ROLE_ARN: ${{ vars.GLUE_ROLE_ARN }}
+          SCRIPT_BUCKET: ${{ vars.CODE_BUCKET }}
+          SCRIPT_PREFIX: ${{ vars.CODE_PREFIX }}
+          JOB_NAME: wistia-silver-visitors
+        run: |
+          set -e
+          SCRIPT_LOCATION="s3://$SCRIPT_BUCKET/$SCRIPT_PREFIX/wistia-silver-visitors.py"
+
+          EXISTING=$(aws glue get-job --job-name "$JOB_NAME" --query 'Job.Name' --output text 2>/dev/null || true)
+
+          if [ -z "$EXISTING" ] || [ "$EXISTING" == "None" ]; then
+            echo "Creating Glue job $JOB_NAME..."
+            aws glue create-job \
+              --name "$JOB_NAME" \
+              --role "$GLUE_ROLE_ARN" \
+              --command "Name=glueetl,ScriptLocation=$SCRIPT_LOCATION,PythonVersion=3" \
+              --default-arguments "{
+                \"--enable-metrics\":\"\",
+                \"--input-uri\":\"${{ vars.RAW_URI }}\",
+                \"--output-uri\":\"${{ vars.SILVER_URI }}\"
+              }"
+          else
+            echo "Updating Glue job $JOB_NAME..."
+            aws glue update-job \
+              --job-name "$JOB_NAME" \
+              --job-update "{
+                \"Role\": \"$GLUE_ROLE_ARN\",
+                \"Command\": {\"Name\":\"glueetl\",\"ScriptLocation\":\"$SCRIPT_LOCATION\",\"PythonVersion\":\"3\"},
+                \"DefaultArguments\": {
+                  \"--enable-metrics\":\"\",
+                  \"--input-uri\":\"${{ vars.RAW_URI }}\",
+                  \"--output-uri\":\"${{ vars.SILVER_URI }}\"
+                }
+              }"
+          fi
+
+      # --- Gold: wistia-gold-dim-media ---
+      - name: Create/Update Glue job (gold dim_media)
+        env:
+          GLUE_ROLE_ARN: ${{ vars.GLUE_ROLE_ARN }}
+          SCRIPT_BUCKET: ${{ vars.CODE_BUCKET }}
+          SCRIPT_PREFIX: ${{ vars.CODE_PREFIX }}
+          JOB_NAME: wistia-gold-dim-media
+        run: |
+          set -e
+          SCRIPT_LOCATION="s3://$SCRIPT_BUCKET/$SCRIPT_PREFIX/wistia-gold-dim-media.py"
+
+          EXISTING=$(aws glue get-job --job-name "$JOB_NAME" --query 'Job.Name' --output text 2>/dev/null || true)
+
+          if [ -z "$EXISTING" ] || [ "$EXISTING" == "None" ]; then
+            echo "Creating Glue job $JOB_NAME..."
+            aws glue create-job \
+              --name "$JOB_NAME" \
+              --role "$GLUE_ROLE_ARN" \
+              --command "Name=glueetl,ScriptLocation=$SCRIPT_LOCATION,PythonVersion=3" \
+              --default-arguments "{
+                \"--enable-metrics\":\"\",
+                \"--silver-uri\":\"${{ vars.SILVER_URI }}\",
+                \"--gold-uri\":\"${{ vars.GOLD_URI }}\"
+              }"
+          else
+            echo "Updating Glue job $JOB_NAME..."
+            aws glue update-job \
+              --job-name "$JOB_NAME" \
+              --job-update "{
+                \"Role\": \"$GLUE_ROLE_ARN\",
+                \"Command\": {\"Name\":\"glueetl\",\"ScriptLocation\":\"$SCRIPT_LOCATION\",\"PythonVersion\":\"3\"},
+                \"DefaultArguments\": {
+                  \"--enable-metrics\":\"\",
+                  \"--silver-uri\":\"${{ vars.SILVER_URI }}\",
+                  \"--gold-uri\":\"${{ vars.GOLD_URI }}\"
+                }
+              }"
+          fi
+
+      # --- Gold: wistia-gold-fact-media-daily ---
+      - name: Create/Update Glue job (gold fact_media_daily)
+        env:
+          GLUE_ROLE_ARN: ${{ vars.GLUE_ROLE_ARN }}
+          SCRIPT_BUCKET: ${{ vars.CODE_BUCKET }}
+          SCRIPT_PREFIX: ${{ vars.CODE_PREFIX }}
+          JOB_NAME: wistia-gold-fact-media-daily
+        run: |
+          set -e
+          SCRIPT_LOCATION="s3://$SCRIPT_BUCKET/$SCRIPT_PREFIX/wistia-gold-fact-media-daily.py"
+
+          EXISTING=$(aws glue get-job --job-name "$JOB_NAME" --query 'Job.Name' --output text 2>/dev/null || true)
+
+          if [ -z "$EXISTING" ] || [ "$EXISTING" == "None" ]; then
+            echo "Creating Glue job $JOB_NAME..."
+            aws glue create-job \
+              --name "$JOB_NAME" \
+              --role "$GLUE_ROLE_ARN" \
+              --command "Name=glueetl,ScriptLocation=$SCRIPT_LOCATION,PythonVersion=3" \
+              --default-arguments "{
+                \"--enable-metrics\":\"\",
+                \"--silver-uri\":\"${{ vars.SILVER_URI }}\",
+                \"--gold-uri\":\"${{ vars.GOLD_URI }}\"
+              }"
+          else
+            echo "Updating Glue job $JOB_NAME..."
+            aws glue update-job \
+              --job-name "$JOB_NAME" \
+              --job-update "{
+                \"Role\": \"$GLUE_ROLE_ARN\",
+                \"Command\": {\"Name\":\"glueetl\",\"ScriptLocation\":\"$SCRIPT_LOCATION\",\"PythonVersion\":\"3\"},
+                \"DefaultArguments\": {
+                  \"--enable-metrics\":\"\",
+                  \"--silver-uri\":\"${{ vars.SILVER_URI }}\",
+                  \"--gold-uri\":\"${{ vars.GOLD_URI }}\"
+                }
+              }"
+          fi
