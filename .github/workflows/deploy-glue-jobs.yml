@@ -66,6 +66,7 @@ jobs:
             aws glue create-job \
               --name "$JOB_NAME" \
               --role "$GLUE_ROLE_ARN" \
+              --glue-version "3.0" \
               --command "Name=glueetl,ScriptLocation=$SCRIPT_LOCATION,PythonVersion=3" \
               --default-arguments "{
                 \"--enable-metrics\":\"\",
@@ -78,6 +79,7 @@ jobs:
               --job-name "$JOB_NAME" \
               --job-update "{
                 \"Role\": \"$GLUE_ROLE_ARN\",
+                \"GlueVersion\": \"3.0\",
                 \"Command\": {\"Name\":\"glueetl\",\"ScriptLocation\":\"$SCRIPT_LOCATION\",\"PythonVersion\":\"3\"},
                 \"DefaultArguments\": {
                   \"--enable-metrics\":\"\",
@@ -105,6 +107,7 @@ jobs:
             aws glue create-job \
               --name "$JOB_NAME" \
               --role "$GLUE_ROLE_ARN" \
+              --glue-version "3.0" \
               --command "Name=glueetl,ScriptLocation=$SCRIPT_LOCATION,PythonVersion=3" \
               --default-arguments "{
                 \"--enable-metrics\":\"\",
@@ -117,6 +120,7 @@ jobs:
               --job-name "$JOB_NAME" \
               --job-update "{
                 \"Role\": \"$GLUE_ROLE_ARN\",
+                \"GlueVersion\": \"3.0\",
                 \"Command\": {\"Name\":\"glueetl\",\"ScriptLocation\":\"$SCRIPT_LOCATION\",\"PythonVersion\":\"3\"},
                 \"DefaultArguments\": {
                   \"--enable-metrics\":\"\",
@@ -144,6 +148,7 @@ jobs:
             aws glue create-job \
               --name "$JOB_NAME" \
               --role "$GLUE_ROLE_ARN" \
+              --glue-version "3.0" \
               --command "Name=glueetl,ScriptLocation=$SCRIPT_LOCATION,PythonVersion=3" \
               --default-arguments "{
                 \"--enable-metrics\":\"\",
@@ -156,6 +161,7 @@ jobs:
               --job-name "$JOB_NAME" \
               --job-update "{
                 \"Role\": \"$GLUE_ROLE_ARN\",
+                \"GlueVersion\": \"3.0\",
                 \"Command\": {\"Name\":\"glueetl\",\"ScriptLocation\":\"$SCRIPT_LOCATION\",\"PythonVersion\":\"3\"},
                 \"DefaultArguments\": {
                   \"--enable-metrics\":\"\",
@@ -183,6 +189,7 @@ jobs:
             aws glue create-job \
               --name "$JOB_NAME" \
               --role "$GLUE_ROLE_ARN" \
+              --glue-version "3.0" \
               --command "Name=glueetl,ScriptLocation=$SCRIPT_LOCATION,PythonVersion=3" \
               --default-arguments "{
                 \"--enable-metrics\":\"\",
@@ -195,6 +202,7 @@ jobs:
               --job-name "$JOB_NAME" \
               --job-update "{
                 \"Role\": \"$GLUE_ROLE_ARN\",
+                \"GlueVersion\": \"3.0\",
                 \"Command\": {\"Name\":\"glueetl\",\"ScriptLocation\":\"$SCRIPT_LOCATION\",\"PythonVersion\":\"3\"},
                 \"DefaultArguments\": {
                   \"--enable-metrics\":\"\",
