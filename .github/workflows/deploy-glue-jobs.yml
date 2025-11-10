@@ -142,6 +142,8 @@ jobs:
           SCRIPT_LOCATION="s3://$SCRIPT_BUCKET/$SCRIPT_PREFIX/wistia-gold-dim-media.py"
 
           EXISTING=$(aws glue get-job --job-name "$JOB_NAME" --query 'Job.Name' --output text 2>/dev/null || true)
+          
+          echo "writing to gold uri: ${{ vars.GOLD_URI }}"
 
           if [ -z "$EXISTING" ] || [ "$EXISTING" == "None" ]; then
             echo "Creating Glue job $JOB_NAME..."
