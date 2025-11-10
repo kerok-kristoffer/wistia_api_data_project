@@ -325,6 +325,150 @@
           }
         }
       ],
+      "Next": "GoldTransforms"
+    },
+    "GoldTransforms": {
+      "Type": "Parallel",
+      "Branches": [
+        {
+          "StartAt": "GoldDimMedia",
+          "States": {
+            "GoldDimMedia": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun.sync",
+              "Parameters": {
+                "JobName": "wistia-gold-dim-media",
+                "Arguments": {
+                  "--day.$": "$$.Execution.Input.day"
+                }
+              },
+              "Next": "LogGoldDimMediaSuccess",
+              "Catch": [
+                {
+                  "ErrorEquals": [
+                    "States.ALL"
+                  ],
+                  "ResultPath": "$",
+                  "Next": "LogGoldDimMediaFailure"
+                }
+              ]
+            },
+            "LogGoldDimMediaSuccess": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::dynamodb:putItem",
+              "Parameters": {
+                "TableName": "kerok-wistia-watermarks",
+                "Item": {
+                  "run_date": {
+                    "S.$": "States.Format('day#{}', $$.Execution.Input.day)"
+                  },
+                  "data_in_process": {
+                    "S": "GOLD_DIM_MEDIA"
+                  },
+                  "status": {
+                    "S": "SUCCEEDED"
+                  },
+                  "updated_at": {
+                    "S.$": "$$.State.EnteredTime"
+                  }
+                }
+              },
+              "End": true
+            },
+            "LogGoldDimMediaFailure": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::dynamodb:putItem",
+              "Parameters": {
+                "TableName": "kerok-wistia-watermarks",
+                "Item": {
+                  "run_date": {
+                    "S.$": "States.Format('day#{}', $$.Execution.Input.day)"
+                  },
+                  "data_in_process": {
+                    "S": "GOLD_DIM_MEDIA"
+                  },
+                  "status": {
+                    "S": "FAILED"
+                  },
+                  "updated_at": {
+                    "S.$": "$$.State.EnteredTime"
+                  }
+                }
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "GoldFactMediaDaily",
+          "States": {
+            "GoldFactMediaDaily": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun.sync",
+              "Parameters": {
+                "JobName": "wistia-gold-fact-media-daily",
+                "Arguments": {
+                  "--day.$": "$$.Execution.Input.day"
+                }
+              },
+              "Next": "LogGoldFactMediaDailySuccess",
+              "Catch": [
+                {
+                  "ErrorEquals": [
+                    "States.ALL"
+                  ],
+                  "ResultPath": "$",
+                  "Next": "LogGoldFactMediaDailyFailure"
+                }
+              ]
+            },
+            "LogGoldFactMediaDailySuccess": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::dynamodb:putItem",
+              "Parameters": {
+                "TableName": "kerok-wistia-watermarks",
+                "Item": {
+                  "run_date": {
+                    "S.$": "States.Format('day#{}', $$.Execution.Input.day)"
+                  },
+                  "data_in_process": {
+                    "S": "GOLD_FACT_MEDIA_DAILY"
+                  },
+                  "status": {
+                    "S": "SUCCEEDED"
+                  },
+                  "updated_at": {
+                    "S.$": "$$.State.EnteredTime"
+                  }
+                }
+              },
+              "End": true
+            },
+            "LogGoldFactMediaDailyFailure": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::dynamodb:putItem",
+              "Parameters": {
+                "TableName": "kerok-wistia-watermarks",
+                "Item": {
+                  "run_date": {
+                    "S.$": "States.Format('day#{}', $$.Execution.Input.day)"
+                  },
+                  "data_in_process": {
+                    "S": "GOLD_FACT_MEDIA_DAILY"
+                  },
+                  "status": {
+                    "S": "FAILED"
+                  },
+                  "updated_at": {
+                    "S.$": "$$.State.EnteredTime"
+                  }
+                }
+              },
+              "End": true
+            }
+          }
+        }
+      ],
       "Next": "MarkPipelineSuccess"
     },
     "MarkPipelineSuccess": {
