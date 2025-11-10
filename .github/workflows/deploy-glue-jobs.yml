@@ -35,10 +35,10 @@ jobs:
           set -e
 
           # Silver scripts
-          aws s3 cp src/transforms/jobs/silver-media.py \
+          aws s3 cp src/transforms/jobs/silver_media.py \
             "s3://$SCRIPT_BUCKET/$SCRIPT_PREFIX/wistia-silver-media.py"
 
-          aws s3 cp src/transforms/jobs/silver-visitors.py \
+          aws s3 cp src/transforms/jobs/silver_visitors.py \
             "s3://$SCRIPT_BUCKET/$SCRIPT_PREFIX/wistia-silver-visitors.py"
 
           # Gold scripts
