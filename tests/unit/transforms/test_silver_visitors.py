@@ -71,7 +71,7 @@ def test_silver_visitors_typing_partitioning_and_dedup(
     )
 
     # Assert
-    df = spark.read.parquet(f"{out_uri}/visitors")
+    df = spark.read.parquet(f"{out_uri}")
     # Partition columns exist
     assert set(["dt", "media_id"]).issubset(df.columns)
 
