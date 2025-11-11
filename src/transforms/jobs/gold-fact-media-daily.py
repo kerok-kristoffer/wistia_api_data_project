@@ -9,6 +9,7 @@ from pyspark.sql.functions import (
     when,
     lit,
     current_timestamp,
+    to_date,
 )
 from pyspark.sql.utils import AnalysisException
 from typing import Dict, Optional
@@ -53,6 +54,10 @@ def read_silver_visitors_for_day(
     path = f"{silver_uri.rstrip('/')}/visitors/dt={day}"
     print(f"[gold_fact_media_daily] Reading visitors from {path}")
     df = spark.read.parquet(path)
+
+    # If dt isn't present in parquet for some reason, reconstruct it from the partition/day arg
+    if "dt" not in df.columns:
+        df = df.withColumn("dt", to_date(lit(day)))
     return df
 
 
