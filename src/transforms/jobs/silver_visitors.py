@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from pyspark.errors import AnalysisException
+try:
+    from pyspark.errors import AnalysisException
+except ImportError:
+    from pyspark.sql.utils import AnalysisException
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import (
     col,
@@ -58,7 +61,7 @@ def build_spark(
 
 def read_raw(spark: SparkSession, input_uri: str, day: str) -> DataFrame:
     # Load the raw JSONL for a single day
-    base = f"{input_uri.rstrip('/')}/dt={day}"
+    base = f"{input_uri.rstrip('/')}/visitors/dt={day}"
     df = spark.read.json(base).withColumn("_source_file", input_file_name())  # JSONL ok
     # Pull media_id from path
     rx = r".*[/\\]media_id=([^/\\]+)[/\\].*"
@@ -125,7 +128,7 @@ def run_job(args_list=None):
     if unknown:
         print(f"[silver_media] Ignoring unknown args from Glue: {unknown}")
 
-    spark = build_spark("silver-wistia-media")
+    spark = build_spark("silver-wistia-visitors")
 
     try:
         raw = read_raw(spark, args.input_uri, args.day)
@@ -135,15 +138,6 @@ def run_job(args_list=None):
             return
         raise
     if raw.rdd.isEmpty():
-        return
-
-    # proj = project(raw)
-    # write_history(proj, args.output_uri, args.day)
-    # if not args.no_snapshot:
-    #     write_snapshot(proj, args.output_uri)
-    raw = read_raw(spark, args.input_uri, args.day)
-    if raw.rdd.isEmpty():
-        # No-op write (keeps pipeline green)
         return
 
     out = transform(raw)
