@@ -61,7 +61,7 @@ def build_spark(
 
 def read_raw(spark: SparkSession, input_uri: str, day: str) -> DataFrame:
     # Load the raw JSONL for a single day
-    base = f"{input_uri.rstrip('/')}/dt={day}"
+    base = f"{input_uri.rstrip('/')}/visitors/dt={day}"
     df = spark.read.json(base).withColumn("_source_file", input_file_name())  # JSONL ok
     # Pull media_id from path
     rx = r".*[/\\]media_id=([^/\\]+)[/\\].*"
