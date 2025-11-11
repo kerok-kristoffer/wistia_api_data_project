@@ -1,55 +1,116 @@
-# Wistia Video Analytics – Data Engineering Pipeline
+# Wistia Video Analytics – AWS Data Pipeline
 
-> **Status:** Planning & scaffolding (architecture + CI/TDD first)
+> **Status:** Completed (end-to-end pipeline + CI/CD)
+
+## Overview
+This project implements a **fully automated AWS data pipeline** for ingesting and transforming **Wistia video analytics** data.  
+The pipeline demonstrates event-driven orchestration, CI/CD with GitHub Actions, and multi-layer data processing using AWS-native services.
+
+---
 
 ## Why
-Marketing wants reliable, daily analytics from **Wistia** (media- and visitor-level) across Facebook/YouTube to understand engagement and improve campaigns.
+Marketing needs reliable, daily engagement metrics from Wistia to understand user behavior and improve content performance.
 
-## Goals
-- Automate **daily ingestion** from the Wistia Stats API (media + visitors).
-- Store raw → curated → mart data in an **AWS-native** lakehouse.
-- Support **incremental loads** (pagination + watermarks) and safe re-runs.
-- Keep the system **testable, observable, and deployable** (CI/CD).
-- Run in “production mode” for **7 consecutive days**.
+My focus for this project was to design, automate, and operate a **production-grade data pipeline**. While validating data quality near completion, I discovered that Wistia’s `/v1/stats/visitors` endpoint does **not support filtering by `media_id`**, resulting in duplicated visitor data across all media IDs.  
+This was an honest oversight due to trusting a faulty reference sample and prioritizing the **CI/CD and orchestration aspects** of the build.
 
-## Scope (high level)
-- **Ingestion:** Python Lambdas calling Wistia (token in Secrets Manager).  
-- **State & retries:** Step Functions (Standard) with a Map state and capped concurrency.  
-- **Watermarks:** DynamoDB (atomic “set-if-greater”) + 2-day transform grace window.  
-- **Storage:** S3 Bronze (JSONL) → Silver/Gold in **Iceberg** (Glue Catalog, Athena).  
-- **Transforms:** PySpark in **AWS Glue Job** (bronze→silver dedupe/upsert, silver→gold rollups).  
-- **Observability:** CloudWatch metrics/alarms; failures → SNS/Slack.  
-- **CI/CD:** GitHub Actions (OIDC to AWS), unit tests + nightly contract test.
+A fix is planned via the `/v1/stats/events` endpoint, but for this project’s evaluation, the emphasis remains on the **infrastructure, automation, and data engineering principles**.
 
-## Architecture at a glance
-- **EventBridge (cron daily)** → **Step Functions**  
-  → **Lambda ingestion (paginated, incremental)** → **S3 Bronze**  
-  → **DynamoDB watermark update** → **Glue Job (PySpark)**  
-  → **Iceberg Silver/Gold** → **Glue Catalog + Athena** → (optional) Streamlit
+---
 
-## Data model (initial)
-- `dim_media(media_id, title, url, channel, created_at)` — Type-1.
-- `dim_visitor(visitor_id, ip_address, country)` — Type-1.
-- `fact_media_engagement(media_id, visitor_id, date, play_count, play_rate, total_watch_time, watched_percent)` — grain: `(media_id, visitor_id, date)`.
+## Architecture Summary
 
-## Process / Way of working
-1. **Design-first:** finalize one-pager + diagram; define tunables (`per_page`, `max_concurrency`, `lookback_days=2`).  
-2. **TDD-first:** start with unit tests for paginator/backoff/watermark; PySpark dedupe tests (small DataFrames).  
-3. **CI-first:** Actions run lint + unit tests on every push; nightly contract test hits Wistia once via OIDC-assumed role.  
-4. **Thin entry points:** Lambda/Glue are thin wrappers; logic lives in testable modules.  
-5. **Idempotency:** Bronze immutable with `run_id` + `updated_at`; Silver MERGE (latest wins).
+**Services used:**
+- **AWS Step Functions** – pipeline orchestration and logging (DynamoDB checkpoints).  
+- **AWS Lambda** – daily ingestion of Wistia Media & Visitor data (Raw/Bronze).  
+- **AWS Glue Jobs (PySpark)** – Silver and Gold transformations (deduplication, aggregation).  
+- **AWS S3** – Bronze → Silver → Gold storage layers.  
+- **AWS DynamoDB** – watermark tracking and pipeline status.  
+- **AWS Athena** – data verification and ad-hoc analytics.  
+- **GitHub Actions (OIDC)** – automated deployment of Lambda and Glue jobs.
 
-## Milestones (light)
-- **Week 1:** API exploration, auth, paginator & watermark tests green.  
-- **Week 2:** Bronze ingestion via Step Functions; basic metrics/alerts.  
-- **Week 3:** PySpark bronze→silver (dedupe/upsert) + Iceberg tables.  
-- **Week 4:** Silver→gold rollups; Athena checks.  
-- **Week 5–6:** 7-day run; polish docs/diagram; (optional) Streamlit demo.
+---
 
-## Repo layout (planned)
+## Architecture Diagram
 
-- ingestion/ # Python client + Lambda handlers + tests
-- transforms/ # PySpark jobs (Glue) + tests
-- infra/ # SAM/CDK templates for Lambda, Step Fn, EventBridge, Glue, IAM
-- .github/workflows # CI (lint/tests) + deploy (OIDC)
-- docs/ # diagram, one-pager, runbook
+![Architecture Diagram](docs/wistia-pipeline-overview.png)
+
+---
+
+## Data Flow (Bronze → Silver → Gold)
+
+| Layer | Description | Format |
+|-------|--------------|--------|
+| **Bronze** | Raw JSONL data from Wistia API (media & visitors) | `.ndjson` |
+| **Silver** | Cleaned + typed + deduplicated PySpark outputs | `.parquet` |
+| **Gold** | Aggregated media performance facts and dimensions | `.parquet` |
+
+---
+
+## CI/CD Highlights
+- GitHub Actions deploys ingestion Lambdas and Glue jobs via **OIDC-authenticated roles** (no static credentials).  
+- Artifacts zipped and pushed to S3 automatically on every commit.  
+- Unit + integration tests executed on PRs (PySpark, boto3 mocks).  
+- Step Function JSON definition versioned in-source and auto-deployed.  
+- Smoke tests trigger sample runs for latest date.
+
+---
+
+## Verification (Athena Queries)
+
+**Gold Fact Table:**
+```sql
+CREATE EXTERNAL TABLE wistia_gold_fact_media_daily (
+  media_id           string,
+  unique_visitors    bigint,
+  loads              bigint,
+  plays              bigint,
+  play_rate          double,
+  gold_ingested_at   timestamp
+)
+STORED AS PARQUET
+LOCATION 's3://kerok-wistia-gold/gold/wistia/fact_media_daily/';
+```
+
+**Example Queries:**
+```sql
+-- Verify data presence
+SELECT dt, COUNT(*) AS rows
+FROM wistia_gold_fact_media_daily
+GROUP BY dt
+ORDER BY dt DESC;
+
+-- Top media by play rate
+SELECT media_id, play_rate, plays, unique_visitors
+FROM wistia_gold_fact_media_daily
+WHERE dt = date '2025-11-10'
+ORDER BY play_rate DESC
+LIMIT 10;
+```
+
+---
+
+## Known Limitations
+- Wistia `/stats/visitors` endpoint does not return per-media data despite accepting a `media_id` parameter.  
+- Current pipeline associates visitors to each media for demonstration purposes only.  
+- Data model and metrics remain technically correct but semantically inaccurate until the endpoint issue is resolved.
+
+---
+
+## Key Learnings & Achievements
+- Built a **multi-step event-driven pipeline** using AWS-native components.  
+- Automated deployment and testing via **GitHub Actions + OIDC**.  
+- Implemented **data lineage, logging, and recovery mechanisms**.  
+- Identified and documented a real-world data consistency issue.  
+- Designed pipeline to be easily extended (future fix via `/stats/events`).
+
+---
+
+## Next Steps
+- Replace `/stats/visitors` with `/stats/events` to enable true per-media visitor attribution.  
+- Expand monitoring with Glue job metrics to CloudWatch dashboards.  
+- Optional: add Streamlit dashboard for visual validation and sharing results.
+
+---
+
+© 2025 Kerok Tech LLC – AWS Data Engineering Portfolio Project
