@@ -128,7 +128,7 @@ def run_job(args_list=None):
     if unknown:
         print(f"[silver_media] Ignoring unknown args from Glue: {unknown}")
 
-    spark = build_spark("silver-wistia-media")
+    spark = build_spark("silver-wistia-visitors")
 
     try:
         raw = read_raw(spark, args.input_uri, args.day)
@@ -138,15 +138,6 @@ def run_job(args_list=None):
             return
         raise
     if raw.rdd.isEmpty():
-        return
-
-    # proj = project(raw)
-    # write_history(proj, args.output_uri, args.day)
-    # if not args.no_snapshot:
-    #     write_snapshot(proj, args.output_uri)
-    raw = read_raw(spark, args.input_uri, args.day)
-    if raw.rdd.isEmpty():
-        # No-op write (keeps pipeline green)
         return
 
     out = transform(raw)

@@ -55,8 +55,8 @@ def test_silver_visitors_typing_partitioning_and_dedup(
         ],
     )
 
-    in_uri = f"file://{base}/raw/wistia/visitors"
-    out_uri = f"file://{base}/silver/wistia/visitors"
+    in_uri = f"file://{base}/raw/wistia"
+    out_uri = f"file://{base}/silver/wistia"
 
     # Act
     run_visitors_job(
@@ -71,7 +71,7 @@ def test_silver_visitors_typing_partitioning_and_dedup(
     )
 
     # Assert
-    df = spark.read.parquet(f"{out_uri}")
+    df = spark.read.parquet(f"{out_uri}/visitors")
     # Partition columns exist
     assert set(["dt", "media_id"]).issubset(df.columns)
 
