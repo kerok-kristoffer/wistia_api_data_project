@@ -54,25 +54,26 @@ flowchart TD
     A[Developer Push / Pull Request] --> B[GitHub Actions CI]
 
     B --> C[Code Quality Checks]
-    C --> C1[Black / Ruff Formatting]
-    C --> C2[Unit Tests<br/>(HTTP client, pagination, watermark logic)]
+    C --> C1[Black and Ruff Formatting]
+    C --> C2[Unit Tests - HTTP client, pagination, watermark logic]
     C --> C3[Spark Transformation Tests]
 
     C --> D{All checks pass?}
-    D -- No --> E[Fail Build<br/>Block Deployment]
-    D -- Yes --> F[Package & Deploy]
+    D -- No --> E[Fail Build - Block Deployment]
+    D -- Yes --> F[Package and Deploy]
 
     F --> F1[Package Lambda Functions]
     F --> F2[Upload Spark Jobs to S3]
-    F --> F3[Assume AWS Role<br/>(OIDC)]
+    F --> F3[Assume AWS Role - OIDC]
 
     F --> G[Runtime Smoke Validation]
     G --> G1[Invoke Lambda Smoke Test]
-    G --> G2[Fail on FunctionError<br/>or Invalid Output]
+    G --> G2[Fail on FunctionError or Invalid Output]
 
     G --> H{Smoke tests pass?}
     H -- No --> E
     H -- Yes --> I[Safe to Run Daily Pipeline]
+
 ```
 
 - GitHub Actions deploys ingestion Lambdas and Glue jobs via **OIDC-authenticated roles** (no static credentials).  
